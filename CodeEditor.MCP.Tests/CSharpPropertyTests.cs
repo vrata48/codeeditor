@@ -65,12 +65,11 @@ namespace TestApp
         var result = service.AnalyzeFile("TestFile.cs");
         
         // Assert
-        result.Should().Contain("Class: TestClass");
-        result.Should().Contain("Property: string Name");
-        result.Should().Contain("Property: int Age");
-        result.Should().Contain("Method: void SomeMethod()");
-    }     
-[Fact]
+        result.Should().Contain("\"name\": \"TestClass\"");
+        result.Should().Contain("\"name\": \"Name\"");
+        result.Should().Contain("\"name\": \"Age\"");
+        result.Should().Contain("\"name\": \"SomeMethod\"");
+    } [Fact]
     public void RemoveProperty_ShouldRemovePropertyFromClass()
     {
         // Arrange

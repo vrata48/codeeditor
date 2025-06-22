@@ -134,11 +134,11 @@ public interface ITestInterface
         fileSystem.AddFile("C:\\temp\\Test.cs", new MockFileData(content));
 
         // Act
-        var results = csharpService.AnalyzeFile("Test.cs");
+        var result = csharpService.AnalyzeFile("Test.cs");
 
         // Assert
-        Assert.Contains("Class: TestClass", results);
-        Assert.Contains("Interface: ITestInterface", results);
-        Assert.Contains("  Property: string InterfaceProperty", results);  // Note the two-space indentation
-        Assert.Contains("  Method: void InterfaceMethod(int parameter)", results);  // Note the two-space indentation
+        Assert.Contains("\"name\": \"TestClass\"", result);
+        Assert.Contains("\"name\": \"ITestInterface\"", result);
+        Assert.Contains("\"name\": \"InterfaceProperty\"", result);
+        Assert.Contains("\"name\": \"InterfaceMethod\"", result);
     } }

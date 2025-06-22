@@ -35,8 +35,7 @@ public class CSharpServiceTests : IDisposable
             Directory.Delete(_tempDirectory, true);
         }
     }
-
-    [Fact]
+[Fact]
     public void AnalyzeFile_SimpleClass_ReturnsClassAndMethods()
     {
         // Arrange
@@ -65,15 +64,15 @@ namespace TestNamespace
         _fileSystem.AddFile(filePath, new MockFileData(code));
 
         // Act
-        var results = _csharpService.AnalyzeFile("TestClass.cs");
+        var result = _csharpService.AnalyzeFile("TestClass.cs");
 
         // Assert
-        results.Should().Contain("Class: TestClass");
-        results.Should().Contain("  Method: void Method1()");
-        results.Should().Contain("  Method: int Method2(string param1, int param2)");
-    }
-
-    [Fact]
+        result.Should().Contain("\"name\": \"TestClass\"");
+        result.Should().Contain("\"name\": \"Method1\"");
+        result.Should().Contain("\"name\": \"Method2\"");
+        result.Should().Contain("\"name\": \"Property\"");
+    } 
+[Fact]
     public void AnalyzeFile_MultipleClasses_ReturnsAllClasses()
     {
         // Arrange
@@ -94,16 +93,15 @@ namespace TestNamespace
         _fileSystem.AddFile(filePath, new MockFileData(code));
 
         // Act
-        var results = _csharpService.AnalyzeFile("MultipleClasses.cs");
+        var result = _csharpService.AnalyzeFile("MultipleClasses.cs");
 
         // Assert
-        results.Should().Contain("Class: FirstClass");
-        results.Should().Contain("Class: SecondClass");
-        results.Should().Contain("  Method: void FirstMethod()");
-        results.Should().Contain("  Method: string SecondMethod(int param)");
-    }
-
-    [Fact]
+        result.Should().Contain("\"name\": \"FirstClass\"");
+        result.Should().Contain("\"name\": \"SecondClass\"");
+        result.Should().Contain("\"name\": \"FirstMethod\"");
+        result.Should().Contain("\"name\": \"SecondMethod\"");
+    } 
+[Fact]
     public void AnalyzeFile_ClassWithoutMethods_ReturnsOnlyClass()
     {
         // Arrange
@@ -120,14 +118,12 @@ namespace TestNamespace
         _fileSystem.AddFile(filePath, new MockFileData(code));
 
         // Act
-        var results = _csharpService.AnalyzeFile("EmptyClass.cs");
+        var result = _csharpService.AnalyzeFile("EmptyClass.cs");
 
         // Assert
-        results.Should().Contain("Class: EmptyClass");
-        results.Should().NotContain(r => r.Contains("Method:"));
-    }
-
-    [Fact]
+        result.Should().Contain("\"name\": \"EmptyClass\"");
+        result.Should().Contain("\"methods\": []"); // Should contain empty methods array
+    }     [Fact]
     public void AddMethod_ToExistingClass_AddsMethodSuccessfully()
     {
         // Arrange
@@ -307,8 +303,7 @@ namespace TestNamespace
         var updatedCode = _fileSystem.File.ReadAllText(filePath);
         updatedCode.Should().Be(originalCode); // Should remain unchanged
     }
-
-    [Fact]
+[Fact]
     public void AnalyzeFile_ComplexMethods_ParsesParametersCorrectly()
     {
         // Arrange
@@ -338,15 +333,16 @@ namespace TestNamespace
         _fileSystem.AddFile(filePath, new MockFileData(code));
 
         // Act
-        var results = _csharpService.AnalyzeFile("ComplexClass.cs");
+        var result = _csharpService.AnalyzeFile("ComplexClass.cs");
 
         // Assert
-        results.Should().Contain("Class: ComplexClass");
-        results.Should().Contain(r => r.Contains("ComplexMethod") && r.Contains("stringParam") && r.Contains("intParam"));
-        results.Should().Contain(r => r.Contains("GenericMethod") && r.Contains("T item"));
-    }
-
-    [Fact]
+        result.Should().Contain("\"name\": \"ComplexClass\"");
+        result.Should().Contain("\"name\": \"ComplexMethod\"");
+        result.Should().Contain("\"name\": \"stringParam\"");
+        result.Should().Contain("\"name\": \"intParam\"");
+        result.Should().Contain("\"name\": \"GenericMethod\"");
+    } 
+[Fact]
     public void AnalyzeFile_NestedClasses_ReturnsAllClasses()
     {
         // Arrange
@@ -367,15 +363,14 @@ namespace TestNamespace
         _fileSystem.AddFile(filePath, new MockFileData(code));
 
         // Act
-        var results = _csharpService.AnalyzeFile("NestedClass.cs");
+        var result = _csharpService.AnalyzeFile("NestedClass.cs");
 
         // Assert
-        results.Should().Contain("Class: OuterClass");
-        results.Should().Contain("Class: NestedClass");
-        results.Should().Contain(r => r.Contains("OuterMethod"));
-        results.Should().Contain(r => r.Contains("NestedMethod"));
-    }
-
+        result.Should().Contain("\"name\": \"OuterClass\"");
+        result.Should().Contain("\"name\": \"NestedClass\"");
+        result.Should().Contain("\"name\": \"OuterMethod\"");
+        result.Should().Contain("\"name\": \"NestedMethod\"");
+    } 
     [Fact]
     public void AddMethod_WithComplexMethodCode_HandlesCorrectly()
     {

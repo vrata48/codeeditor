@@ -7,52 +7,60 @@ namespace CodeEditor.MCP.Services;
 
 public class CSharpService(IFileSystem fileSystem, IPathService pathService) : ICSharpService
 {
-public string[] AnalyzeFile(string relativePath)
+public string AnalyzeFile(string relativePath)
     {
         var fullPath = pathService.GetFullPath(relativePath);
         var content = fileSystem.File.ReadAllText(fullPath);
         var tree = CSharpSyntaxTree.ParseText(content);
         var root = tree.GetRoot();
 
-        var results = new List<string>();
+        var analysis = new {
+            classes = new List<object>(),
+            interfaces = new List<object>()
+        };
 
         foreach (var classDecl in root.DescendantNodes().OfType<ClassDeclarationSyntax>())
         {
-            results.Add($"Class: {classDecl.Identifier.ValueText}");
-
-            foreach (var property in classDecl.Members.OfType<PropertyDeclarationSyntax>())
-            {
-                results.Add($"  Property: {property.Type} {property.Identifier}");
-            }
-
-            foreach (var method in classDecl.Members.OfType<MethodDeclarationSyntax>())
-            {
-                var parameters = string.Join(", ",
-                    method.ParameterList.Parameters.Select(p => $"{p.Type} {p.Identifier}"));
-                results.Add($"  Method: {method.ReturnType} {method.Identifier}({parameters})");
-            }
+            var classInfo = new {
+                name = classDecl.Identifier.ValueText,
+                properties = classDecl.Members.OfType<PropertyDeclarationSyntax>().Select(p => new {
+                    type = p.Type.ToString(),
+                    name = p.Identifier.ValueText
+                }).ToList(),
+                methods = classDecl.Members.OfType<MethodDeclarationSyntax>().Select(m => new {
+                    returnType = m.ReturnType.ToString(),
+                    name = m.Identifier.ValueText,
+                    parameters = m.ParameterList.Parameters.Select(p => new {
+                        type = p.Type?.ToString(),
+                        name = p.Identifier.ValueText
+                    }).ToList()
+                }).ToList()
+            };
+            analysis.classes.Add(classInfo);
         }
 
         foreach (var interfaceDecl in root.DescendantNodes().OfType<InterfaceDeclarationSyntax>())
         {
-            results.Add($"Interface: {interfaceDecl.Identifier.ValueText}");
-
-            foreach (var property in interfaceDecl.Members.OfType<PropertyDeclarationSyntax>())
-            {
-                results.Add($"  Property: {property.Type} {property.Identifier}");
-            }
-
-            foreach (var method in interfaceDecl.Members.OfType<MethodDeclarationSyntax>())
-            {
-                var parameters = string.Join(", ",
-                    method.ParameterList.Parameters.Select(p => $"{p.Type} {p.Identifier}"));
-                results.Add($"  Method: {method.ReturnType} {method.Identifier}({parameters})");
-            }
+            var interfaceInfo = new {
+                name = interfaceDecl.Identifier.ValueText,
+                properties = interfaceDecl.Members.OfType<PropertyDeclarationSyntax>().Select(p => new {
+                    type = p.Type.ToString(),
+                    name = p.Identifier.ValueText
+                }).ToList(),
+                methods = interfaceDecl.Members.OfType<MethodDeclarationSyntax>().Select(m => new {
+                    returnType = m.ReturnType.ToString(),
+                    name = m.Identifier.ValueText,
+                    parameters = m.ParameterList.Parameters.Select(p => new {
+                        type = p.Type?.ToString(),
+                        name = p.Identifier.ValueText
+                    }).ToList()
+                }).ToList()
+            };
+            analysis.interfaces.Add(interfaceInfo);
         }
 
-        return results.ToArray();
-    } 
-    public void AddMethod(string relativePath, string className, string methodCode)
+        return System.Text.Json.JsonSerializer.Serialize(analysis, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+    }     public void AddMethod(string relativePath, string className, string methodCode)
     {
         var fullPath = pathService.GetFullPath(relativePath);
         var content = fileSystem.File.ReadAllText(fullPath);

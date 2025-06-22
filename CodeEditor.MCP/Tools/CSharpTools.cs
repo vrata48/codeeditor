@@ -7,15 +7,14 @@ namespace CodeEditor.MCP.Tools;
 [McpServerToolType]
 public static class CSharpTools
 {
-    [McpServerTool]
+[McpServerTool]
     [Description("Analyze C# file for classes and methods")]
-    public static string[] AnalyzeFile(
+    public static string AnalyzeFile(
         ICSharpService service,
         [Description("Relative path to .cs file")] string path)
     {
         return service.AnalyzeFile(path);
-    }
-    
+    }     
     [McpServerTool]
     [Description("Add method to C# class")]
     public static void AddMethod(
