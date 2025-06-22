@@ -42,8 +42,18 @@ public class CSharpService(IFileSystem fileSystem, IPathService pathService) : I
         
         if (classDecl != null)
         {
-            var method = CSharpSyntaxTree.ParseText(methodCode).GetRoot()
-                .DescendantNodes().OfType<MethodDeclarationSyntax>().First();
+            // Try to parse the method code and extract the first method
+            var wrappedCode = $"class DummyClass {{ {methodCode} }}";
+            var methodTree = CSharpSyntaxTree.ParseText(wrappedCode);
+            var methodRoot = methodTree.GetRoot();
+            var method = methodRoot.DescendantNodes()
+                .OfType<MethodDeclarationSyntax>()
+                .FirstOrDefault();
+            
+            if (method == null)
+            {
+                throw new ArgumentException($"No valid method declaration found in the provided method code: {methodCode}");
+            }
             
             var newClass = classDecl.AddMembers(method);
             var newRoot = root.ReplaceNode(classDecl, newClass);
@@ -69,8 +79,16 @@ public class CSharpService(IFileSystem fileSystem, IPathService pathService) : I
             
             if (oldMethod != null)
             {
-                var newMethod = CSharpSyntaxTree.ParseText(newMethodCode).GetRoot()
-                    .DescendantNodes().OfType<MethodDeclarationSyntax>().First();
+                // Try to parse the new method code and extract the first method
+                var wrappedCode = $"class DummyClass {{ {newMethodCode} }}";
+                var methodTree = CSharpSyntaxTree.ParseText(wrappedCode);
+                var methodRoot = methodTree.GetRoot();
+                var newMethod = methodRoot.DescendantNodes().OfType<MethodDeclarationSyntax>().FirstOrDefault();
+                
+                if (newMethod == null)
+                {
+                    throw new ArgumentException($"No valid method declaration found in the provided method code: {newMethodCode}");
+                }
                 
                 var newClass = classDecl.ReplaceNode(oldMethod, newMethod);
                 var newRoot = root.ReplaceNode(classDecl, newClass);

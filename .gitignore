@@ -1,4 +1,25 @@
-CodeEditor.MCP/obj/
-CodeEditor.MCP/bin/
-CodeEditor.MCP/.idea/
+# Git repository
+.git/
+
+# Build outputs
+*/bin/
+*/obj/
+bin/
+obj/
+
+# IDE folders
+.idea/
+.vs/
+.vscode/
+
+# Release artifacts
 Releases/
+
+# User-specific files
+*.user
+*.suo
+*.cache
+
+# Temporary files
+*.tmp
+*.temp

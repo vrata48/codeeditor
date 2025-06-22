@@ -10,7 +10,7 @@ public static class BuildTools
     [McpServerTool]
     [Description("Build C# project.")]
     public static async Task<string> BuildProject(
-        IBuildService service,
+        IDotNetService service,
         [Description("Path to .csproj file.")] string path)
     {
         return await service.BuildProject(path);
@@ -19,7 +19,7 @@ public static class BuildTools
     [McpServerTool]
     [Description("Build C# solution.")]
     public static async Task<string> BuildSolution(
-        IBuildService service,
+        IDotNetService service,
         [Description("Path to .sln file.")] string path)
     {
         return await service.BuildSolution(path);

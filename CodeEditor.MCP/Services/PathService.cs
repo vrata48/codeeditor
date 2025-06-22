@@ -1,17 +1,30 @@
+using Ignore;
+
 namespace CodeEditor.MCP.Services;
 
-public class PathService(string baseDirectory) : IPathService
+public class PathService : IPathService
 {
-    private readonly string _baseDirectory = Path.GetFullPath(baseDirectory);
-    private readonly Ignore.Ignore _ignore = CreateIgnore(baseDirectory);
+    private readonly string _baseDirectory;
+    private readonly Ignore.Ignore _ignore = new();
 
-    private static Ignore.Ignore CreateIgnore(string baseDirectory)
+    public PathService(string baseDirectory)
     {
-        var ignore = new Ignore.Ignore();
-        var gitignorePath = Path.Combine(baseDirectory, ".gitignore");
+        _baseDirectory = Path.GetFullPath(baseDirectory);
+        
+        // Load .gitignore if it exists
+        var gitignorePath = Path.Combine(_baseDirectory, ".gitignore");
         if (File.Exists(gitignorePath))
-            ignore.Add(gitignorePath);
-        return ignore;
+        {
+            try
+            {
+                var gitignoreContent = File.ReadAllLines(gitignorePath);
+                _ignore.Add(gitignoreContent);
+            }
+            catch
+            {
+                // If we can't read the .gitignore file, continue with empty rules
+            }
+        }
     }
 
     public string GetFullPath(string relativePath)
@@ -34,7 +47,12 @@ public class PathService(string baseDirectory) : IPathService
 
     public bool ShouldIgnore(string relativePath)
     {
-        return _ignore.IsIgnored(relativePath);
+        if (string.IsNullOrEmpty(relativePath))
+            return false;
+            
+        // Normalize path separators to forward slashes for gitignore compatibility
+        var normalizedPath = relativePath.Replace(Path.DirectorySeparatorChar, '/');
+        return _ignore.IsIgnored(normalizedPath);
     }
 
     public IEnumerable<string> FilterIgnored(IEnumerable<string> relativePaths)

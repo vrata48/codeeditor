@@ -9,7 +9,22 @@ public class FileService(IFileSystem fileSystem, IPathService pathService) : IFi
         var fullPath = pathService.GetFullPath(relativePath);
         var files = fileSystem.Directory.GetFileSystemEntries(fullPath, "*", SearchOption.AllDirectories);
         var baseDir = pathService.GetBaseDirectory();
-        var relativePaths = files.Select(f => Path.GetRelativePath(baseDir, f));
+        
+        var relativePaths = files.Select(f => 
+        {
+            var relPath = Path.GetRelativePath(baseDir, f);
+            // Normalize path separators to forward slashes for gitignore compatibility
+            relPath = relPath.Replace(Path.DirectorySeparatorChar, '/');
+            
+            // Append trailing slash for directories to match gitignore directory patterns
+            if (fileSystem.Directory.Exists(f))
+            {
+                relPath += "/";
+            }
+            
+            return relPath;
+        });
+        
         return pathService.FilterIgnored(relativePaths).ToArray();
     }
     
@@ -37,14 +52,21 @@ public class FileService(IFileSystem fileSystem, IPathService pathService) : IFi
     
     public string[] SearchFiles(string searchText, string relativePath = "")
     {
-        var files = ListFiles(relativePath).Where(f => fileSystem.File.Exists(pathService.GetFullPath(f)));
+        var files = ListFiles(relativePath).Where(f => 
+        {
+            // Remove trailing slash for file existence check
+            var pathForCheck = f.TrimEnd('/');
+            return fileSystem.File.Exists(pathService.GetFullPath(pathForCheck));
+        });
         var matches = new List<string>();
         
         foreach (var file in files)
         {
             try
             {
-                var content = ReadFile(file);
+                // Remove trailing slash for file reading
+                var pathForReading = file.TrimEnd('/');
+                var content = ReadFile(pathForReading);
                 if (content.Contains(searchText, StringComparison.OrdinalIgnoreCase))
                     matches.Add(file);
             }
