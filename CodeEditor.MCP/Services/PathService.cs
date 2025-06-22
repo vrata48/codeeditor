@@ -69,4 +69,23 @@ public class PathService : IPathService
         return fullPath.StartsWith(_baseDirectory + Path.DirectorySeparatorChar) || 
                fullPath.Equals(_baseDirectory, StringComparison.OrdinalIgnoreCase);
     }
-}
+public string GetNamespaceFromPath(string relativePath)
+    {
+        if (string.IsNullOrEmpty(relativePath))
+            return "DefaultNamespace";
+
+        // Get directory path and convert to namespace format
+        var directory = Path.GetDirectoryName(relativePath) ?? "";
+        
+        // Replace path separators with dots and remove any invalid characters
+        var namespaceName = directory
+            .Replace(Path.DirectorySeparatorChar, '.')
+            .Replace(Path.AltDirectorySeparatorChar, '.')
+            .Trim('.');
+
+        // If empty, use a default namespace
+        if (string.IsNullOrEmpty(namespaceName))
+            return "DefaultNamespace";
+
+        return namespaceName;
+    } }
