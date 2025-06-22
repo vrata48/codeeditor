@@ -7,4 +7,4 @@ public interface IPathService
     bool ShouldIgnore(string relativePath);
     IEnumerable<string> FilterIgnored(IEnumerable<string> relativePaths);
     string GetNamespaceFromPath(string relativePath);
-}
+string GetRelativePath(string fullPath); }

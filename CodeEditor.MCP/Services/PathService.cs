@@ -88,4 +88,17 @@ public string GetNamespaceFromPath(string relativePath)
             return "DefaultNamespace";
 
         return namespaceName;
+    } public string GetRelativePath(string fullPath)
+    {
+        if (string.IsNullOrEmpty(fullPath))
+            return "";
+
+        // Ensure the full path is normalized
+        var normalizedFullPath = Path.GetFullPath(fullPath);
+        var normalizedBasePath = Path.GetFullPath(_baseDirectory);
+
+        // Get the relative path
+        var relativePath = Path.GetRelativePath(normalizedBasePath, normalizedFullPath);
+        
+        return relativePath;
     } }
