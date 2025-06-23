@@ -1,9 +1,8 @@
-using CodeEditor.MCP.Services;
+﻿using CodeEditor.MCP.Services;
 using System.IO.Abstractions.TestingHelpers;
 using Xunit;
 
 namespace CodeEditor.MCP.Tests;
-
 public class InterfaceTests
 {
     [Fact]
@@ -11,20 +10,17 @@ public class InterfaceTests
     {
         // Arrange
         var fileSystem = new MockFileSystem();
-        var pathService = new PathService("C:\\temp");
+        var pathService = new PathService("/temp");
         var csharpService = new CSharpService(fileSystem, pathService);
-        
         var interfaceCode = @"public interface ITestInterface
 {
     void TestMethod();
 }";
-
         // Act
         csharpService.CreateInterface("TestInterface.cs", "ITestInterface", interfaceCode);
-
         // Assert
-        Assert.True(fileSystem.File.Exists("C:\\temp\\TestInterface.cs"));
-        var content = fileSystem.File.ReadAllText("C:\\temp\\TestInterface.cs");
+        Assert.True(fileSystem.File.Exists("/temp/TestInterface.cs"));
+        var content = fileSystem.File.ReadAllText("/temp/TestInterface.cs");
         Assert.Contains("interface ITestInterface", content);
         Assert.Contains("void TestMethod();", content);
     }
@@ -34,23 +30,19 @@ public class InterfaceTests
     {
         // Arrange
         var fileSystem = new MockFileSystem();
-        var pathService = new PathService("C:\\temp");
+        var pathService = new PathService("/temp");
         var csharpService = new CSharpService(fileSystem, pathService);
-        
         var initialContent = @"namespace TestNamespace;
 
 public interface ITestInterface
 {
     void ExistingMethod();
 }";
-        
-        fileSystem.AddFile("C:\\temp\\TestInterface.cs", new MockFileData(initialContent));
-
+        fileSystem.AddFile("/temp/TestInterface.cs", new MockFileData(initialContent));
         // Act
         csharpService.AddMethodToInterface("TestInterface.cs", "ITestInterface", "string NewMethod(int parameter);");
-
         // Assert
-        var content = fileSystem.File.ReadAllText("C:\\temp\\TestInterface.cs");
+        var content = fileSystem.File.ReadAllText("/temp/TestInterface.cs");
         Assert.Contains("void ExistingMethod();", content);
         Assert.Contains("string NewMethod(int parameter);", content);
     }
@@ -60,9 +52,8 @@ public interface ITestInterface
     {
         // Arrange
         var fileSystem = new MockFileSystem();
-        var pathService = new PathService("C:\\temp");
+        var pathService = new PathService("/temp");
         var csharpService = new CSharpService(fileSystem, pathService);
-        
         var initialContent = @"namespace TestNamespace;
 
 public interface ITestInterface
@@ -70,14 +61,11 @@ public interface ITestInterface
     void OldMethod();
     void AnotherMethod();
 }";
-        
-        fileSystem.AddFile("C:\\temp\\TestInterface.cs", new MockFileData(initialContent));
-
+        fileSystem.AddFile("/temp/TestInterface.cs", new MockFileData(initialContent));
         // Act
         csharpService.ReplaceMethodInInterface("TestInterface.cs", "ITestInterface", "OldMethod", "string NewMethod(int parameter);");
-
         // Assert
-        var content = fileSystem.File.ReadAllText("C:\\temp\\TestInterface.cs");
+        var content = fileSystem.File.ReadAllText("/temp/TestInterface.cs");
         Assert.DoesNotContain("void OldMethod();", content);
         Assert.Contains("string NewMethod(int parameter);", content);
         Assert.Contains("void AnotherMethod();", content);
@@ -88,9 +76,8 @@ public interface ITestInterface
     {
         // Arrange
         var fileSystem = new MockFileSystem();
-        var pathService = new PathService("C:\\temp");
+        var pathService = new PathService("/temp");
         var csharpService = new CSharpService(fileSystem, pathService);
-        
         var initialContent = @"namespace TestNamespace;
 
 public interface ITestInterface
@@ -98,25 +85,22 @@ public interface ITestInterface
     void MethodToRemove();
     void MethodToKeep();
 }";
-        
-        fileSystem.AddFile("C:\\temp\\TestInterface.cs", new MockFileData(initialContent));
-
+        fileSystem.AddFile("/temp/TestInterface.cs", new MockFileData(initialContent));
         // Act
         csharpService.RemoveMethodFromInterface("TestInterface.cs", "ITestInterface", "MethodToRemove");
-
         // Assert
-        var content = fileSystem.File.ReadAllText("C:\\temp\\TestInterface.cs");
+        var content = fileSystem.File.ReadAllText("/temp/TestInterface.cs");
         Assert.DoesNotContain("void MethodToRemove();", content);
         Assert.Contains("void MethodToKeep();", content);
     }
-[Fact]
+
+    [Fact]
     public void AnalyzeFile_ShouldIncludeInterfaceInformation()
     {
         // Arrange
         var fileSystem = new MockFileSystem();
-        var pathService = new PathService("C:\\temp");
+        var pathService = new PathService("/temp");
         var csharpService = new CSharpService(fileSystem, pathService);
-        
         var content = @"namespace TestNamespace;
 
 public class TestClass
@@ -130,15 +114,13 @@ public interface ITestInterface
     string InterfaceProperty { get; }
     void InterfaceMethod(int parameter);
 }";
-        
-        fileSystem.AddFile("C:\\temp\\Test.cs", new MockFileData(content));
-
+        fileSystem.AddFile("/temp/Test.cs", new MockFileData(content));
         // Act
         var result = csharpService.AnalyzeFile("Test.cs");
-
         // Assert
         Assert.Contains("\"name\": \"TestClass\"", result);
         Assert.Contains("\"name\": \"ITestInterface\"", result);
         Assert.Contains("\"name\": \"InterfaceProperty\"", result);
         Assert.Contains("\"name\": \"InterfaceMethod\"", result);
-    } }
+    }
+}
