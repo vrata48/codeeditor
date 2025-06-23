@@ -14,4 +14,4 @@ string AnalyzeFile(string relativePath);     void AddMethod(string relativePath,
     void AddMethodToInterface(string relativePath, string interfaceName, string methodSignature);
     void ReplaceMethodInInterface(string relativePath, string interfaceName, string oldMethodName, string newMethodSignature);
     void RemoveMethodFromInterface(string relativePath, string interfaceName, string methodName);
-}
+string ReadMethodBody(string relativePath, string className, string methodName); }

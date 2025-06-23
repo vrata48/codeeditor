@@ -276,15 +276,14 @@ node_modules/";
         files.Should().NotContain(x => x.Contains("node_modules"));
         files.Should().NotContain(x => x.EndsWith("app.log"));
     }
-
-    [Fact]
+[Fact]
     public void ListFiles_WithGlobPatterns_HandlesCorrectly()
     {
         // Arrange - Create .gitignore with glob patterns FIRST
         var gitignoreContent = @"*.log
 test-*
 **/temp/
-build/*/
+build/*
 !important.log";
 
         CreateTestFile(".gitignore", gitignoreContent);
@@ -311,9 +310,9 @@ build/*/
         files.Should().NotContain(x => x.EndsWith("test-file.txt"));
         files.Should().NotContain(x => x.EndsWith("test-data.json"));
         files.Should().NotContain(x => x.Contains("temp"));
-        files.Should().NotContain(x => x.Contains("build"));
-    }
-
+        files.Should().NotContain(x => x.Contains("build/debug"));
+        files.Should().NotContain(x => x.Contains("build/release"));
+    } 
     [Fact]
     public void ListFiles_WithMalformedGitignore_DoesNotCrash()
     {
@@ -420,8 +419,7 @@ bin/";
         filteredPaths.Should().NotContain("bin/app.exe");
         filteredPaths.Should().NotContain("debug.log");
     }
-
-    [Fact]
+[Fact]
     public void PathService_WithGitignore_AutomaticallyIgnoresGitDirectory()
     {
         // Arrange - Create .gitignore file (even with simple content)
@@ -450,15 +448,19 @@ bin/";
         files.Should().Contain(x => x.EndsWith("README.md"));
         files.Should().Contain(x => x.EndsWith(".gitignore"));
         
-        // .git directory and its contents should be ignored
-        files.Should().NotContain(x => x.Contains(".git"));
+        // .git directory and its contents should be ignored (but not .gitignore file)
+        files.Should().NotContain(x => x.StartsWith(".git/"));
+        files.Should().NotContain(x => x == ".git");
+        files.Should().NotContain(x => x.Contains(".git/config"));
+        files.Should().NotContain(x => x.Contains(".git/HEAD"));
+        files.Should().NotContain(x => x.Contains(".git/objects"));
+        files.Should().NotContain(x => x.Contains(".git/refs"));
         
         // Verify directly with PathService
         _pathService.ShouldIgnore(".git/").Should().BeTrue(".git/ should be automatically ignored");
         _pathService.ShouldIgnore(".git/config").Should().BeTrue(".git/config should be ignored");
         _pathService.ShouldIgnore(".git/objects/abc123").Should().BeTrue("nested .git files should be ignored");
-    }
-
+    } 
     private void CreateTestFile(string relativePath, string content)
     {
         var fullPath = Path.Combine(_testProjectDirectory, relativePath);

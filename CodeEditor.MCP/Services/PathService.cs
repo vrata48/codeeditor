@@ -18,7 +18,23 @@ public class PathService : IPathService
             try
             {
                 var gitignoreContent = File.ReadAllLines(gitignorePath);
-                _ignore.Add(gitignoreContent);
+                
+                // Add patterns one by one to handle malformed patterns gracefully
+                foreach (var line in gitignoreContent)
+                {
+                    if (!string.IsNullOrWhiteSpace(line) && !line.TrimStart().StartsWith("#"))
+                    {
+                        try
+                        {
+                            _ignore.Add(line);
+                        }
+                        catch
+                        {
+                            // Skip malformed patterns but continue with others
+                            continue;
+                        }
+                    }
+                }
             }
             catch
             {
@@ -44,17 +60,20 @@ public class PathService : IPathService
     {
         return _baseDirectory;
     }
-
-    public bool ShouldIgnore(string relativePath)
+public bool ShouldIgnore(string relativePath)
     {
         if (string.IsNullOrEmpty(relativePath))
             return false;
             
         // Normalize path separators to forward slashes for gitignore compatibility
         var normalizedPath = relativePath.Replace(Path.DirectorySeparatorChar, '/');
+        
+        // Always ignore .git directory and its contents
+        if (normalizedPath.StartsWith(".git/") || normalizedPath == ".git")
+            return true;
+            
         return _ignore.IsIgnored(normalizedPath);
-    }
-
+    } 
     public IEnumerable<string> FilterIgnored(IEnumerable<string> relativePaths)
     {
         return relativePaths.Where(p => !ShouldIgnore(p));
@@ -69,7 +88,8 @@ public class PathService : IPathService
         return fullPath.StartsWith(_baseDirectory + Path.DirectorySeparatorChar) || 
                fullPath.Equals(_baseDirectory, StringComparison.OrdinalIgnoreCase);
     }
-public string GetNamespaceFromPath(string relativePath)
+
+    public string GetNamespaceFromPath(string relativePath)
     {
         if (string.IsNullOrEmpty(relativePath))
             return "DefaultNamespace";
@@ -88,7 +108,9 @@ public string GetNamespaceFromPath(string relativePath)
             return "DefaultNamespace";
 
         return namespaceName;
-    } public string GetRelativePath(string fullPath)
+    }
+
+    public string GetRelativePath(string fullPath)
     {
         if (string.IsNullOrEmpty(fullPath))
             return "";
@@ -101,4 +123,5 @@ public string GetNamespaceFromPath(string relativePath)
         var relativePath = Path.GetRelativePath(normalizedBasePath, normalizedFullPath);
         
         return relativePath;
-    } }
+    }
+}

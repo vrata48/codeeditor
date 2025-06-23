@@ -375,4 +375,47 @@ public void CreateInterface(string relativePath, string interfaceName, string in
                 fileSystem.File.WriteAllText(fullPath, newRoot.ToFullString());
             }
         }
+    } public string ReadMethodBody(string relativePath, string className, string methodName)
+    {
+        var fullPath = pathService.GetFullPath(relativePath);
+        var content = fileSystem.File.ReadAllText(fullPath);
+        var tree = CSharpSyntaxTree.ParseText(content);
+        var root = tree.GetRoot();
+
+        var classDecl = root.DescendantNodes().OfType<ClassDeclarationSyntax>()
+            .FirstOrDefault(c => c.Identifier.ValueText == className);
+
+        if (classDecl == null)
+        {
+            throw new ArgumentException($"Class '{className}' not found in file '{relativePath}'");
+        }
+
+        var method = classDecl.Members.OfType<MethodDeclarationSyntax>()
+            .FirstOrDefault(m => m.Identifier.ValueText == methodName);
+
+        if (method == null)
+        {
+            throw new ArgumentException($"Method '{methodName}' not found in class '{className}' in file '{relativePath}'");
+        }
+
+        if (method.Body == null)
+        {
+            // Handle expression-bodied methods
+            if (method.ExpressionBody != null)
+            {
+                return method.ExpressionBody.ToFullString().Trim();
+            }
+            
+            // Method has no body (e.g., abstract method, interface method)
+            return "";
+        }
+
+        // Return the method body without the surrounding braces
+        var bodyStatements = method.Body.Statements;
+        if (bodyStatements.Count == 0)
+        {
+            return "";
+        }
+
+        return string.Join("\n", bodyStatements.Select(s => s.ToFullString().Trim()));
     } }

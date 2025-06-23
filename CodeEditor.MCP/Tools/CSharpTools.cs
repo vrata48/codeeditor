@@ -119,4 +119,13 @@ public static class CSharpTools
         [Description("Name of method to remove")] string methodName)
     {
         service.RemoveMethodFromInterface(path, interfaceName, methodName);
+    } [McpServerTool]
+    [Description("Read the body of a specific method from a C# class")]
+    public static string ReadMethodBody(
+        ICSharpService service,
+        [Description("Relative path to .cs file")] string path,
+        [Description("Name of the class")] string className,
+        [Description("Name of the method")] string methodName)
+    {
+        return service.ReadMethodBody(path, className, methodName);
     } }

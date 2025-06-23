@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Linq;
 using CodeEditor.MCP.Services;
 using CodeEditor.MCP.Extensions;
 using ModelContextProtocol.Server;
@@ -15,7 +16,16 @@ public static class BuildTools
         [Description("Path to .csproj file.")] string path)
     {
         var result = await service.BuildProjectAsync(path);
-        return result.ToFormattedJson();
+        var json = result.ToFormattedJson();
+        
+        if (!result.Success && result.ParsedErrors.Any())
+        {
+            var formattedErrors = result.ParsedErrors.Select(e => 
+                $"{e.Severity} {e.ErrorCode}: {e.Message}\n  {e.File}({e.Line},{e.Column})");
+            json += "\n\nParsed Errors:\n" + string.Join("\n", formattedErrors);
+        }
+        
+        return json;
     }
 
     [McpServerTool]
@@ -56,22 +66,52 @@ public static class BuildTools
         string path)
     {
         var result = await service.RestorePackagesAsync(path);
-        return result.ToFormattedJson();
+        var json = result.ToFormattedJson();
+        
+        if (!result.Success && result.ParsedErrors.Any())
+        {
+            var formattedErrors = result.ParsedErrors.Select(e => 
+                $"{e.Severity} {e.ErrorCode}: {e.Message}\n  {e.File}({e.Line},{e.Column})");
+            json += "\n\nParsed Errors:\n" + string.Join("\n", formattedErrors);
+        }
+        
+        return json;
     }
 
     [McpServerTool]
-    [Description("Run unit tests for a project.")]
+    [Description("Run tests for a project.")]
     public static async Task<string> RunTests(
         IDotNetService service,
         [Description("Path to test .csproj file.")]
         string path)
     {
         var result = await service.RunTestsAsync(path);
-        return result.ToFormattedJson();
+        var json = result.ToFormattedJson();
+        
+        if (!result.Success)
+        {
+            // Add failed test details if any
+            if (result.FailedTests.Any())
+            {
+                json += "\n\nFailed Tests:\n";
+                foreach (var test in result.FailedTests)
+                {
+                    json += $"- {test.TestName} ({test.ClassName})\n";
+                    json += $"  Error: {test.ErrorMessage}\n";
+                    if (!string.IsNullOrEmpty(test.StackTrace))
+                    {
+                        json += $"  Stack Trace: {test.StackTrace}\n";
+                    }
+                    json += "\n";
+                }
+            }
+        }
+        
+        return "Test Result:\n" + json;
     }
 
     [McpServerTool]
-    [Description("Run filtered unit tests for a project.")]
+    [Description("Run filtered tests for a project.")]
     public static async Task<string> RunTestsFiltered(
         IDotNetService service,
         [Description("Path to test .csproj file.")]
@@ -80,10 +120,30 @@ public static class BuildTools
         string filter)
     {
         var result = await service.RunTestsAsync(path, filter);
-        return result.ToFormattedJson();
+        var json = result.ToFormattedJson();
+        
+        if (!result.Success)
+        {
+            // Add failed test details if any
+            if (result.FailedTests.Any())
+            {
+                json += "\n\nFailed Tests:\n";
+                foreach (var test in result.FailedTests)
+                {
+                    json += $"- {test.TestName} ({test.ClassName})\n";
+                    json += $"  Error: {test.ErrorMessage}\n";
+                    if (!string.IsNullOrEmpty(test.StackTrace))
+                    {
+                        json += $"  Stack Trace: {test.StackTrace}\n";
+                    }
+                    json += "\n";
+                }
+            }
+        }
+        
+        return "Test Result:\n" + json;
     }
-
-    [McpServerTool]
+[McpServerTool]
     [Description("Publish C# project.")]
     public static async Task<string> PublishProject(
         IDotNetService service,
@@ -93,5 +153,4 @@ public static class BuildTools
     {
         var result = await service.PublishProjectAsync(path, outputPath);
         return result.ToFormattedJson();
-    }
-}
+    } }

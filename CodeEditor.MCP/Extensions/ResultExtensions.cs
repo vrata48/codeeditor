@@ -47,9 +47,11 @@ public static class ResultExtensions
 
     public static string ToFormattedJson(this TestResult result)
     {
+        object resultObject;
+        
         if (result.Success)
         {
-            var successResult = new
+            resultObject = new
             {
                 success = true,
                 exitCode = result.ExitCode,
@@ -58,12 +60,10 @@ public static class ResultExtensions
                 failed = result.TestsFailed,
                 skipped = result.TestsSkipped
             };
-
-            return JsonSerializer.Serialize(successResult, new JsonSerializerOptions { WriteIndented = true });
         }
         else
         {
-            var failureResult = new
+            resultObject = new
             {
                 success = false,
                 exitCode = result.ExitCode,
@@ -71,21 +71,21 @@ public static class ResultExtensions
                 passed = result.TestsPassed,
                 failed = result.TestsFailed,
                 skipped = result.TestsSkipped,
-                output = !string.IsNullOrEmpty(result.Output) ? result.Output : null,
-                errors = !string.IsNullOrEmpty(result.Errors) ? result.Errors : null,
+                output = !string.IsNullOrEmpty(result.Output) ? result.Output : (string?)null,
+                errors = !string.IsNullOrEmpty(result.Errors) ? result.Errors : (string?)null,
                 failedTests = result.FailedTests.Any() ? result.FailedTests.Select(t => new
                 {
                     testName = t.TestName,
                     className = t.ClassName,
                     errorMessage = t.ErrorMessage,
-                    stackTrace = !string.IsNullOrEmpty(t.StackTrace) ? t.StackTrace : null
+                    stackTrace = !string.IsNullOrEmpty(t.StackTrace) ? t.StackTrace : (string?)null
                 }).ToList() : null
             };
-
-            return JsonSerializer.Serialize(failureResult, new JsonSerializerOptions { 
-                WriteIndented = true,
-                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
-            });
         }
+
+        return JsonSerializer.Serialize(resultObject, new JsonSerializerOptions { 
+            WriteIndented = true,
+            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+        });
     }
 }

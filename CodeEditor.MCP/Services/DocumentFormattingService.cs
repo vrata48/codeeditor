@@ -1,6 +1,5 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.Formatting;
 using System.IO.Abstractions;
 using System.Text;
 
@@ -51,11 +50,9 @@ public class DocumentFormattingService : IDocumentFormattingService
                 return $"Error: Cannot format document due to syntax errors:\n{string.Join("\n", errorMessages)}";
             }
 
-            // Create workspace and apply formatting
-            using var workspace = new AdhocWorkspace();
-            var formattedRoot = Formatter.Format(root, workspace);
-            
-            var formattedText = formattedRoot.ToFullString();
+            // Use NormalizeWhitespace for reliable formatting without workspace dependencies
+            var normalizedRoot = root.NormalizeWhitespace();
+            var formattedText = normalizedRoot.ToFullString();
             
             // Write the formatted content back to the file
             _fileSystem.File.WriteAllText(fullPath, formattedText, Encoding.UTF8);
@@ -161,9 +158,8 @@ public class DocumentFormattingService : IDocumentFormattingService
             }
 
             // Format the document and compare
-            using var workspace = new AdhocWorkspace();
-            var formattedRoot = Formatter.Format(root, workspace);
-            var formattedText = formattedRoot.ToFullString();
+            var normalizedRoot = root.NormalizeWhitespace();
+            var formattedText = normalizedRoot.ToFullString();
 
             var isFormatted = string.Equals(sourceText.Trim(), formattedText.Trim(), StringComparison.Ordinal);
 
