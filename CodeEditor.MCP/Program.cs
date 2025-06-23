@@ -22,6 +22,7 @@ await Parser.Default.ParseArguments<Options>(args)
         builder.Services.AddSingleton<ICSharpService, CSharpService>();
         builder.Services.AddSingleton<IDotNetService, DotNetService>();
         builder.Services.AddSingleton<ICSharpFormattingService, CSharpFormattingService>();
+        builder.Services.AddSingleton<IFileAnalysisService, FileAnalysisService>();
 
         builder.Services
             .AddMcpServer()

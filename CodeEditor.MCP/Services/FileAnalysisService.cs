@@ -1,20 +1,19 @@
-using System.ComponentModel;
+using System.Text;
 using System.Text.RegularExpressions;
-using CodeEditor.MCP.Services;
-using ModelContextProtocol.Server;
+using CodeEditor.MCP.Models;
 
-namespace CodeEditor.MCP.Tools;
+namespace CodeEditor.MCP.Services;
 
-[McpServerToolType]
-public static class ContextTools
+public class FileAnalysisService : IFileAnalysisService
 {
-    [McpServerTool]
-    [Description("Read specific line ranges from files")]
-    public static async Task<string> ReadFileLines(
-        IPathService pathService,
-        [Description("Relative path to file")] string path,
-        [Description("Starting line number (1-based)")] int startLine,
-        [Description("Ending line number (1-based, inclusive)")] int endLine)
+    private readonly IPathService _pathService;
+
+    public FileAnalysisService(IPathService pathService)
+    {
+        _pathService = pathService;
+    }
+
+    public async Task<string> ReadFileLinesAsync(string path, int startLine, int endLine)
     {
         if (string.IsNullOrEmpty(path))
             throw new ArgumentException("Path cannot be null or empty", nameof(path));
@@ -25,7 +24,7 @@ public static class ContextTools
         if (endLine < startLine)
             throw new ArgumentException("End line must be >= start line", nameof(endLine));
 
-        var fullPath = pathService.GetFullPath(path);
+        var fullPath = _pathService.GetFullPath(path);
         if (!File.Exists(fullPath))
             throw new FileNotFoundException($"File not found: {path}");
 
@@ -57,46 +56,32 @@ public static class ContextTools
         }
     }
 
-    [McpServerTool]
-    [Description("Read lines around a specific line number")]
-    public static async Task<string> ReadAroundLine(
-        IPathService pathService,
-        [Description("Relative path to file")] string path,
-        [Description("Line number to center on (1-based)")] int centerLine,
-        [Description("Number of lines to include before and after center line")] int contextLines = 5)
+    public async Task<string> ReadAroundLineAsync(string path, int centerLine, int contextLines = 5)
     {
         var startLine = Math.Max(1, centerLine - contextLines);
         var endLine = centerLine + contextLines;
         
-        return await ReadFileLines(pathService, path, startLine, endLine);
+        return await ReadFileLinesAsync(path, startLine, endLine);
     }
 
-    [McpServerTool]
-    [Description("Search for text in files with surrounding context")]
-    public static async Task<string> SearchFilesWithContext(
-        IPathService pathService,
-        [Description("Text to search for")] string text,
-        [Description("Path to search in (default: root)")] string path = "",
-        [Description("Number of lines to include before and after match")] int contextLines = 3,
-        [Description("File pattern filter (e.g., \"*.cs\")")] string filePattern = "*",
-        [Description("Maximum number of results to return")] int maxResults = 20)
+    public async Task<string> SearchFilesWithContextAsync(string text, string path = "", int contextLines = 3, string filePattern = "*", int maxResults = 20)
     {
         if (string.IsNullOrEmpty(text))
             throw new ArgumentException("Search text cannot be null or empty", nameof(text));
 
-        var searchPath = string.IsNullOrEmpty(path) ? Directory.GetCurrentDirectory() : pathService.GetFullPath(path);
+        var searchPath = string.IsNullOrEmpty(path) ? Directory.GetCurrentDirectory() : _pathService.GetFullPath(path);
         
         if (!Directory.Exists(searchPath) && !File.Exists(searchPath))
             throw new DirectoryNotFoundException($"Path not found: {searchPath}");
 
         var results = new List<SearchResult>();
-        var files = GetFilesToSearch(searchPath, filePattern, pathService);
+        var files = GetFilesToSearch(searchPath, filePattern);
 
         foreach (var file in files.Take(100)) // Limit files to search
         {
             try
             {
-                var matches = await SearchFileWithContextAsync(file, text, contextLines, pathService);
+                var matches = await SearchFileWithContextAsync(file, text, contextLines);
                 results.AddRange(matches);
                 
                 if (results.Count >= maxResults)
@@ -112,13 +97,7 @@ public static class ContextTools
         return FormatSearchResults(results.Take(maxResults).ToList(), text);
     }
 
-    [McpServerTool]
-    [Description("Get method signatures from C# files without implementation details")]
-    public static async Task<string> GetMethodSignatures(
-        IPathService pathService,
-        [Description("Relative path to .cs file")] string path,
-        [Description("Optional: specific class name to analyze")] string? className = null,
-        [Description("Include property signatures")] bool includeProperties = true)
+    public async Task<string> GetMethodSignaturesAsync(string path, string? className = null, bool includeProperties = true)
     {
         if (string.IsNullOrEmpty(path))
             throw new ArgumentException("Path cannot be null or empty", nameof(path));
@@ -126,7 +105,7 @@ public static class ContextTools
         if (!path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
             throw new ArgumentException("File must be a C# file (.cs)", nameof(path));
 
-        var fullPath = pathService.GetFullPath(path);
+        var fullPath = _pathService.GetFullPath(path);
         if (!File.Exists(fullPath))
             throw new FileNotFoundException($"File not found: {path}");
 
@@ -146,85 +125,21 @@ public static class ContextTools
         }
     }
 
-    [McpServerTool]
-    [Description("Generate structured directory overview with filtering")]
-    public static async Task<string> FileTreeSummary(
-        IPathService pathService,
-        [Description("Path to analyze (default: root)")] string path = "",
-        [Description("Maximum directory depth to traverse")] int maxDepth = 3,
-        [Description("File extensions to include (e.g., \"cs,json,md\")")] string fileTypes = "",
-        [Description("Include hidden files and directories")] bool includeHidden = false,
-        [Description("Include file sizes and line counts")] bool includeDetails = true,
-        [Description("Sort files by: name, size, modified, extension")] string sortBy = "name")
+    public async Task<string> GetFileTreeSummaryAsync(string path = "", int maxDepth = 3, string fileTypes = "", bool includeHidden = false, bool includeDetails = true, string sortBy = "name")
     {
-        var searchPath = string.IsNullOrEmpty(path) ? Directory.GetCurrentDirectory() : pathService.GetFullPath(path);
+        var searchPath = string.IsNullOrEmpty(path) ? Directory.GetCurrentDirectory() : _pathService.GetFullPath(path);
         
         if (!Directory.Exists(searchPath))
             throw new DirectoryNotFoundException($"Directory not found: {searchPath}");
 
         var allowedExtensions = ParseFileTypes(fileTypes);
-        var dirInfo = await AnalyzeDirectoryAsync(searchPath, "", 0, maxDepth, allowedExtensions, includeHidden, includeDetails, pathService);
+        var dirInfo = await AnalyzeDirectoryAsync(searchPath, "", 0, maxDepth, allowedExtensions, includeHidden, includeDetails);
         
         return FormatDirectoryTree(dirInfo, includeDetails, sortBy);
     }
 
-    // Helper classes and methods
-    private class SearchResult
-    {
-        public string FilePath { get; set; } = "";
-        public int LineNumber { get; set; }
-        public string MatchLine { get; set; } = "";
-        public List<string> ContextBefore { get; set; } = new();
-        public List<string> ContextAfter { get; set; } = new();
-        public string MatchedText { get; set; } = "";
-    }
-
-    private class MethodSignature
-    {
-        public string Name { get; set; } = "";
-        public string ReturnType { get; set; } = "";
-        public List<string> Parameters { get; set; } = new();
-        public string AccessModifier { get; set; } = "";
-        public List<string> Modifiers { get; set; } = new();
-        public string FullSignature { get; set; } = "";
-        public int LineNumber { get; set; }
-        public string ClassName { get; set; } = "";
-        public List<string> Attributes { get; set; } = new();
-    }
-
-    private class PropertySignature
-    {
-        public string Name { get; set; } = "";
-        public string Type { get; set; } = "";
-        public string AccessModifier { get; set; } = "";
-        public List<string> Modifiers { get; set; } = new();
-        public string Accessors { get; set; } = "";
-        public int LineNumber { get; set; }
-        public List<string> Attributes { get; set; } = new();
-    }
-
-    private class DirectoryInfo
-    {
-        public string Name { get; set; } = "";
-        public string RelativePath { get; set; } = "";
-        public List<FileInfo> Files { get; set; } = new();
-        public List<DirectoryInfo> Subdirectories { get; set; } = new();
-        public int TotalFiles { get; set; }
-        public long TotalSize { get; set; }
-    }
-
-    private class FileInfo
-    {
-        public string Name { get; set; } = "";
-        public string RelativePath { get; set; } = "";
-        public long Size { get; set; }
-        public DateTime LastModified { get; set; }
-        public string Extension { get; set; } = "";
-        public int LineCount { get; set; }
-    }
-
-    // Implementation methods
-    private static IEnumerable<string> GetFilesToSearch(string searchPath, string filePattern, IPathService pathService)
+    // Private helper methods
+    private IEnumerable<string> GetFilesToSearch(string searchPath, string filePattern)
     {
         if (File.Exists(searchPath))
         {
@@ -250,7 +165,7 @@ public static class ContextTools
                ignoreExtensions.Any(ext => filePath.EndsWith(ext, StringComparison.OrdinalIgnoreCase));
     }
 
-    private static async Task<List<SearchResult>> SearchFileWithContextAsync(string filePath, string searchText, int contextLines, IPathService pathService)
+    private async Task<List<SearchResult>> SearchFileWithContextAsync(string filePath, string searchText, int contextLines)
     {
         var results = new List<SearchResult>();
         var allLines = await File.ReadAllLinesAsync(filePath);
@@ -294,7 +209,7 @@ public static class ContextTools
         if (!results.Any())
             return $"No matches found for '{searchText}'";
 
-        var output = new System.Text.StringBuilder();
+        var output = new StringBuilder();
         output.AppendLine($"Found {results.Count} matches for '{searchText}':");
         output.AppendLine();
 
@@ -323,7 +238,7 @@ public static class ContextTools
         return output.ToString();
     }
 
-    private static List<MethodSignature> ExtractMethodSignatures(string content, string[] lines, string? targetClassName)
+    private List<MethodSignature> ExtractMethodSignatures(string content, string[] lines, string? targetClassName)
     {
         var methods = new List<MethodSignature>();
         var currentClass = "";
@@ -369,7 +284,7 @@ public static class ContextTools
         return methods;
     }
 
-    private static List<PropertySignature> ExtractPropertySignatures(string content, string[] lines, string? targetClassName)
+    private List<PropertySignature> ExtractPropertySignatures(string content, string[] lines, string? targetClassName)
     {
         var properties = new List<PropertySignature>();
         var currentClass = "";
@@ -521,7 +436,7 @@ public static class ContextTools
 
     private static string FormatSignatureOutput(string path, List<MethodSignature> methods, List<PropertySignature> properties, string? className)
     {
-        var output = new System.Text.StringBuilder();
+        var output = new StringBuilder();
         
         var title = string.IsNullOrEmpty(className) 
             ? $"Method signatures from {path}" 
@@ -588,10 +503,10 @@ public static class ContextTools
             .ToHashSet();
     }
 
-    private static async Task<DirectoryInfo> AnalyzeDirectoryAsync(string fullPath, string relativePath, int currentDepth, 
-        int maxDepth, HashSet<string> allowedExtensions, bool includeHidden, bool includeDetails, IPathService pathService)
+    private async Task<Models.DirectoryInfo> AnalyzeDirectoryAsync(string fullPath, string relativePath, int currentDepth, 
+        int maxDepth, HashSet<string> allowedExtensions, bool includeHidden, bool includeDetails)
     {
-        var dirInfo = new DirectoryInfo
+        var dirInfo = new Models.DirectoryInfo
         {
             Name = Path.GetFileName(fullPath) ?? "root",
             RelativePath = relativePath
@@ -624,7 +539,7 @@ public static class ContextTools
                 {
                     var subRelativePath = Path.Combine(relativePath, Path.GetFileName(directory));
                     var subDirInfo = await AnalyzeDirectoryAsync(directory, subRelativePath, currentDepth + 1, 
-                        maxDepth, allowedExtensions, includeHidden, includeDetails, pathService);
+                        maxDepth, allowedExtensions, includeHidden, includeDetails);
                     
                     dirInfo.Subdirectories.Add(subDirInfo);
                     dirInfo.TotalFiles += subDirInfo.TotalFiles;
@@ -640,10 +555,10 @@ public static class ContextTools
         return dirInfo;
     }
 
-    private static async Task<FileInfo> CreateFileInfoAsync(string filePath, string basePath, bool includeDetails)
+    private static async Task<Models.FileInfo> CreateFileInfoAsync(string filePath, string basePath, bool includeDetails)
     {
         var file = new System.IO.FileInfo(filePath);
-        var fileInfo = new FileInfo
+        var fileInfo = new Models.FileInfo
         {
             Name = file.Name,
             RelativePath = Path.GetRelativePath(basePath, filePath),
@@ -715,9 +630,9 @@ public static class ContextTools
         return textExtensions.Contains(extension);
     }
 
-    private static string FormatDirectoryTree(DirectoryInfo dirInfo, bool includeDetails, string sortBy)
+    private static string FormatDirectoryTree(Models.DirectoryInfo dirInfo, bool includeDetails, string sortBy)
     {
-        var output = new System.Text.StringBuilder();
+        var output = new StringBuilder();
         
         output.AppendLine($"📁 Directory Tree Summary: {dirInfo.Name}");
         output.AppendLine(new string('=', 50));
@@ -734,7 +649,7 @@ public static class ContextTools
         return output.ToString();
     }
 
-    private static void FormatDirectoryRecursive(System.Text.StringBuilder output, DirectoryInfo dirInfo, string indent, 
+    private static void FormatDirectoryRecursive(StringBuilder output, Models.DirectoryInfo dirInfo, string indent, 
         bool includeDetails, string sortBy)
     {
         // Sort files
@@ -763,7 +678,7 @@ public static class ContextTools
         }
     }
 
-    private static List<FileInfo> SortFiles(List<FileInfo> files, string sortBy)
+    private static List<Models.FileInfo> SortFiles(List<Models.FileInfo> files, string sortBy)
     {
         return sortBy.ToLowerInvariant() switch
         {
