@@ -1,17 +1,15 @@
-using System.IO.Abstractions.TestingHelpers;
+﻿using System.IO.Abstractions.TestingHelpers;
 using CodeEditor.MCP.Services;
 using FluentAssertions;
 
 namespace CodeEditor.MCP.Tests;
-
 public class CSharpServiceTests : IDisposable
 {
     private readonly string _tempDirectory;
     private readonly string _testProjectDirectory;
-    private PathService _pathService = null!;
-    private CSharpService _csharpService = null!;
-    private MockFileSystem _fileSystem = null!;
-
+    private PathService _pathService = null !;
+    private CSharpService _csharpService = null !;
+    private MockFileSystem _fileSystem = null !;
     public CSharpServiceTests()
     {
         _tempDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
@@ -35,7 +33,8 @@ public class CSharpServiceTests : IDisposable
             Directory.Delete(_tempDirectory, true);
         }
     }
-[Fact]
+
+    [Fact]
     public void AnalyzeFile_SimpleClass_ReturnsClassAndMethods()
     {
         // Arrange
@@ -62,17 +61,16 @@ namespace TestNamespace
 }";
         var filePath = Path.Combine(_testProjectDirectory, "TestClass.cs");
         _fileSystem.AddFile(filePath, new MockFileData(code));
-
         // Act
         var result = _csharpService.AnalyzeFile("TestClass.cs");
-
         // Assert
         result.Should().Contain("\"name\": \"TestClass\"");
         result.Should().Contain("\"name\": \"Method1\"");
         result.Should().Contain("\"name\": \"Method2\"");
         result.Should().Contain("\"name\": \"Property\"");
-    } 
-[Fact]
+    }
+
+    [Fact]
     public void AnalyzeFile_MultipleClasses_ReturnsAllClasses()
     {
         // Arrange
@@ -91,17 +89,16 @@ namespace TestNamespace
 }";
         var filePath = Path.Combine(_testProjectDirectory, "MultipleClasses.cs");
         _fileSystem.AddFile(filePath, new MockFileData(code));
-
         // Act
         var result = _csharpService.AnalyzeFile("MultipleClasses.cs");
-
         // Assert
         result.Should().Contain("\"name\": \"FirstClass\"");
         result.Should().Contain("\"name\": \"SecondClass\"");
         result.Should().Contain("\"name\": \"FirstMethod\"");
         result.Should().Contain("\"name\": \"SecondMethod\"");
-    } 
-[Fact]
+    }
+
+    [Fact]
     public void AnalyzeFile_ClassWithoutMethods_ReturnsOnlyClass()
     {
         // Arrange
@@ -116,14 +113,14 @@ namespace TestNamespace
 }";
         var filePath = Path.Combine(_testProjectDirectory, "EmptyClass.cs");
         _fileSystem.AddFile(filePath, new MockFileData(code));
-
         // Act
         var result = _csharpService.AnalyzeFile("EmptyClass.cs");
-
         // Assert
         result.Should().Contain("\"name\": \"EmptyClass\"");
         result.Should().Contain("\"methods\": []"); // Should contain empty methods array
-    }     [Fact]
+    }
+
+    [Fact]
     public void AddMethod_ToExistingClass_AddsMethodSuccessfully()
     {
         // Arrange
@@ -142,13 +139,10 @@ namespace TestNamespace
         {
             return param.ToString();
         }";
-        
         var filePath = Path.Combine(_testProjectDirectory, "TestClass.cs");
         _fileSystem.AddFile(filePath, new MockFileData(originalCode));
-
         // Act
         _csharpService.AddMethod("TestClass.cs", "TestClass", methodCode);
-
         // Assert
         var updatedCode = _fileSystem.File.ReadAllText(filePath);
         updatedCode.Should().Contain("ExistingMethod");
@@ -170,13 +164,10 @@ namespace TestNamespace
 }";
         var methodCode = @"
         public string NewMethod() { return string.Empty; }";
-        
         var filePath = Path.Combine(_testProjectDirectory, "TestClass.cs");
         _fileSystem.AddFile(filePath, new MockFileData(originalCode));
-
         // Act
         _csharpService.AddMethod("TestClass.cs", "NonExistentClass", methodCode);
-
         // Assert
         var updatedCode = _fileSystem.File.ReadAllText(filePath);
         updatedCode.Should().Be(originalCode); // Should remain unchanged
@@ -206,13 +197,10 @@ namespace TestNamespace
         {
             Console.WriteLine(""New implementation"");
         }";
-        
         var filePath = Path.Combine(_testProjectDirectory, "TestClass.cs");
         _fileSystem.AddFile(filePath, new MockFileData(originalCode));
-
         // Act
         _csharpService.ReplaceMethod("TestClass.cs", "TestClass", "MethodToReplace", newMethodCode);
-
         // Assert
         var updatedCode = _fileSystem.File.ReadAllText(filePath);
         updatedCode.Should().Contain("New implementation");
@@ -233,13 +221,10 @@ namespace TestNamespace
     }
 }";
         var newMethodCode = @"public void NewMethod() { }";
-        
         var filePath = Path.Combine(_testProjectDirectory, "TestClass.cs");
         _fileSystem.AddFile(filePath, new MockFileData(originalCode));
-
         // Act
         _csharpService.ReplaceMethod("TestClass.cs", "TestClass", "NonExistentMethod", newMethodCode);
-
         // Assert
         var updatedCode = _fileSystem.File.ReadAllText(filePath);
         updatedCode.Should().Be(originalCode); // Should remain unchanged
@@ -265,13 +250,10 @@ namespace TestNamespace
         }
     }
 }";
-        
         var filePath = Path.Combine(_testProjectDirectory, "TestClass.cs");
         _fileSystem.AddFile(filePath, new MockFileData(originalCode));
-
         // Act
         _csharpService.RemoveMethod("TestClass.cs", "TestClass", "MethodToRemove");
-
         // Assert
         var updatedCode = _fileSystem.File.ReadAllText(filePath);
         updatedCode.Should().NotContain("MethodToRemove");
@@ -292,18 +274,16 @@ namespace TestNamespace
         public void ExistingMethod() { }
     }
 }";
-        
         var filePath = Path.Combine(_testProjectDirectory, "TestClass.cs");
         _fileSystem.AddFile(filePath, new MockFileData(originalCode));
-
         // Act
         _csharpService.RemoveMethod("TestClass.cs", "TestClass", "NonExistentMethod");
-
         // Assert
         var updatedCode = _fileSystem.File.ReadAllText(filePath);
         updatedCode.Should().Be(originalCode); // Should remain unchanged
     }
-[Fact]
+
+    [Fact]
     public void AnalyzeFile_ComplexMethods_ParsesParametersCorrectly()
     {
         // Arrange
@@ -331,18 +311,17 @@ namespace TestNamespace
 }";
         var filePath = Path.Combine(_testProjectDirectory, "ComplexClass.cs");
         _fileSystem.AddFile(filePath, new MockFileData(code));
-
         // Act
         var result = _csharpService.AnalyzeFile("ComplexClass.cs");
-
         // Assert
         result.Should().Contain("\"name\": \"ComplexClass\"");
         result.Should().Contain("\"name\": \"ComplexMethod\"");
         result.Should().Contain("\"name\": \"stringParam\"");
         result.Should().Contain("\"name\": \"intParam\"");
         result.Should().Contain("\"name\": \"GenericMethod\"");
-    } 
-[Fact]
+    }
+
+    [Fact]
     public void AnalyzeFile_NestedClasses_ReturnsAllClasses()
     {
         // Arrange
@@ -361,16 +340,15 @@ namespace TestNamespace
 }";
         var filePath = Path.Combine(_testProjectDirectory, "NestedClass.cs");
         _fileSystem.AddFile(filePath, new MockFileData(code));
-
         // Act
         var result = _csharpService.AnalyzeFile("NestedClass.cs");
-
         // Assert
         result.Should().Contain("\"name\": \"OuterClass\"");
         result.Should().Contain("\"name\": \"NestedClass\"");
         result.Should().Contain("\"name\": \"OuterMethod\"");
         result.Should().Contain("\"name\": \"NestedMethod\"");
-    } 
+    }
+
     [Fact]
     public void AddMethod_WithComplexMethodCode_HandlesCorrectly()
     {
@@ -397,13 +375,10 @@ namespace TestNamespace
                 
             return await Task.FromResult(input.ToUpper());
         }";
-        
         var filePath = Path.Combine(_testProjectDirectory, "TestClass.cs");
         _fileSystem.AddFile(filePath, new MockFileData(originalCode));
-
         // Act
         _csharpService.AddMethod("TestClass.cs", "TestClass", complexMethodCode);
-
         // Assert
         var updatedCode = _fileSystem.File.ReadAllText(filePath);
         updatedCode.Should().Contain("ComplexNewMethod");
@@ -411,7 +386,8 @@ namespace TestNamespace
         updatedCode.Should().Contain("Obsolete");
         updatedCode.Should().Contain("ArgumentException");
     }
-[Fact]
+
+    [Fact]
     public void ReadMethodBody_ExistingMethod_ReturnsCorrectBody()
     {
         // Arrange
@@ -430,15 +406,15 @@ namespace TestNamespace
 }";
         var filePath = Path.Combine(_testProjectDirectory, "TestClass.cs");
         _fileSystem.AddFile(filePath, new MockFileData(code));
-
         // Act
         var result = _csharpService.ReadMethodBody("TestClass.cs", "TestClass", "TestMethod");
-
         // Assert
         result.Should().Contain("Console.WriteLine(\"Hello World\");");
         result.Should().Contain("var x = 10;");
         result.Should().Contain("return;");
-    } [Fact]
+    }
+
+    [Fact]
     public void ReadMethodBody_EmptyMethod_ReturnsEmptyString()
     {
         // Arrange
@@ -454,13 +430,13 @@ namespace TestNamespace
 }";
         var filePath = Path.Combine(_testProjectDirectory, "TestClass.cs");
         _fileSystem.AddFile(filePath, new MockFileData(code));
-
         // Act
         var result = _csharpService.ReadMethodBody("TestClass.cs", "TestClass", "EmptyMethod");
-
         // Assert
         result.Should().BeEmpty();
-    } [Fact]
+    }
+
+    [Fact]
     public void ReadMethodBody_ExpressionBodiedMethod_ReturnsExpression()
     {
         // Arrange
@@ -474,13 +450,13 @@ namespace TestNamespace
 }";
         var filePath = Path.Combine(_testProjectDirectory, "TestClass.cs");
         _fileSystem.AddFile(filePath, new MockFileData(code));
-
         // Act
         var result = _csharpService.ReadMethodBody("TestClass.cs", "TestClass", "GetMessage");
-
         // Assert
         result.Should().Contain("\"Hello World\"");
-    } [Fact]
+    }
+
+    [Fact]
     public void ReadMethodBody_MethodNotFound_ThrowsArgumentException()
     {
         // Arrange
@@ -494,12 +470,12 @@ namespace TestNamespace
 }";
         var filePath = Path.Combine(_testProjectDirectory, "TestClass.cs");
         _fileSystem.AddFile(filePath, new MockFileData(code));
-
         // Act & Assert
         Action act = () => _csharpService.ReadMethodBody("TestClass.cs", "TestClass", "NonExistentMethod");
-        act.Should().Throw<ArgumentException>()
-            .WithMessage("Method 'NonExistentMethod' not found in class 'TestClass' in file 'TestClass.cs'");
-    } [Fact]
+        act.Should().Throw<ArgumentException>().WithMessage("Method 'NonExistentMethod' not found in class 'TestClass' in file 'TestClass.cs'");
+    }
+
+    [Fact]
     public void ReadMethodBody_ClassNotFound_ThrowsArgumentException()
     {
         // Arrange
@@ -513,12 +489,12 @@ namespace TestNamespace
 }";
         var filePath = Path.Combine(_testProjectDirectory, "TestClass.cs");
         _fileSystem.AddFile(filePath, new MockFileData(code));
-
         // Act & Assert
         Action act = () => _csharpService.ReadMethodBody("TestClass.cs", "NonExistentClass", "TestMethod");
-        act.Should().Throw<ArgumentException>()
-            .WithMessage("Class 'NonExistentClass' not found in file 'TestClass.cs'");
-    } [Fact]
+        act.Should().Throw<ArgumentException>().WithMessage("Class 'NonExistentClass' not found in file 'TestClass.cs'");
+    }
+
+    [Fact]
     public void ReadMethodBody_ComplexMethodBody_ReturnsFormattedCode()
     {
         // Arrange
@@ -543,10 +519,8 @@ namespace TestNamespace
 }";
         var filePath = Path.Combine(_testProjectDirectory, "TestClass.cs");
         _fileSystem.AddFile(filePath, new MockFileData(code));
-
         // Act
         var result = _csharpService.ReadMethodBody("TestClass.cs", "TestClass", "ComplexMethod");
-
         // Assert
         result.Should().Contain("if (string.IsNullOrEmpty(input))");
         result.Should().Contain("throw new ArgumentException");
@@ -554,7 +528,9 @@ namespace TestNamespace
         result.Should().Contain("var formatted = result.ToUpper();");
         result.Should().Contain("return formatted;");
         result.Should().NotContain("public async Task<string> ComplexMethod"); // Should not include method signature
-    } [Fact]
+    }
+
+    [Fact]
     public void ReadMethodBody_AbstractMethod_ReturnsEmptyString()
     {
         // Arrange
@@ -573,15 +549,15 @@ namespace TestNamespace
 }";
         var filePath = Path.Combine(_testProjectDirectory, "TestClass.cs");
         _fileSystem.AddFile(filePath, new MockFileData(code));
-
         // Act
         var abstractResult = _csharpService.ReadMethodBody("TestClass.cs", "TestClass", "AbstractMethod");
         var virtualResult = _csharpService.ReadMethodBody("TestClass.cs", "TestClass", "VirtualMethod");
-
         // Assert
         abstractResult.Should().BeEmpty(); // Abstract methods have no body
         virtualResult.Should().Contain("Console.WriteLine(\"Virtual implementation\");"); // Virtual methods can have body
-    } [Fact]
+    }
+
+    [Fact]
     public void FormatDocument_WithBadlyFormattedCode_FormatsCorrectly()
     {
         // Arrange
@@ -596,26 +572,23 @@ Console.WriteLine(""Hello World"");
 }";
         var filePath = Path.Combine(_testProjectDirectory, "BadFormat.cs");
         _fileSystem.AddFile(filePath, new MockFileData(badlyFormattedCode));
-
         // Create required services
         var fileService = new FileService(_fileSystem, _pathService);
-        var formattingService = new DocumentFormattingService(fileService, _pathService, _fileSystem);
-
+        var formattingService = new CSharpFormattingService(fileService, _pathService, _fileSystem);
         // Act
         var result = formattingService.FormatDocument("BadFormat.cs");
-
         // Assert
         result.Should().Contain("Successfully formatted");
-        
         // Check that the file was actually formatted
         var formattedContent = _fileSystem.File.ReadAllText(filePath);
         formattedContent.Should().NotBe(badlyFormattedCode);
-        
         // Check for basic structure improvements
         formattedContent.Should().Contain("namespace BadFormat");
         formattedContent.Should().Contain("public class TestClass");
         formattedContent.Should().Contain("Console.WriteLine");
-    } [Fact]
+    }
+
+    [Fact]
     public void FormatDocument_WithSyntaxErrors_ReturnsErrorMessage()
     {
         // Arrange - Create a C# file with syntax errors
@@ -633,42 +606,13 @@ Console.WriteLine(""Hello"");
 }";
         var filePath = Path.Combine(_testProjectDirectory, "BadSyntax.cs");
         _fileSystem.AddFile(filePath, new MockFileData(badCode));
-
         // Create required services
         var fileService = new FileService(_fileSystem, _pathService);
-        var formattingService = new DocumentFormattingService(fileService, _pathService, _fileSystem);
-
+        var formattingService = new CSharpFormattingService(fileService, _pathService, _fileSystem);
         // Act
         var result = formattingService.FormatDocument("BadSyntax.cs");
-
         // Assert
         result.Should().Contain("Error: Cannot format document due to syntax errors");
         result.Should().Contain("Line");
-    } [Fact]
-    public void ValidateFormatting_WithBadFormatting_ReturnsValidationFailure()
-    {
-        // Arrange - Create a badly formatted C# file
-        var badlyFormattedCode = @"using System;
-
-namespace Test{
-public class BadFormat{
-public void Method1(){
-Console.WriteLine(""Hello"");
+    }
 }
-}
-}";
-        var filePath = Path.Combine(_testProjectDirectory, "BadFormatValidation.cs");
-        _fileSystem.AddFile(filePath, new MockFileData(badlyFormattedCode));
-
-        // Create required services
-        var fileService = new FileService(_fileSystem, _pathService);
-        var formattingService = new DocumentFormattingService(fileService, _pathService, _fileSystem);
-
-        // Act
-        var result = formattingService.ValidateFormatting("BadFormatValidation.cs");
-
-        // Assert
-        result.Should().Contain("Document formatting issues found");
-        result.Should().Contain("Lines with formatting differences:");
-        result.Should().Contain("Run FormatDocument to fix formatting issues");
-    } }
