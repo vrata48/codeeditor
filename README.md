@@ -7,6 +7,18 @@ This project has just begun development and may not work as expected. Features a
 
 This is a **Model Context Protocol (MCP) server** designed to enable AI assistants to write, edit, and manage code files directly. The server provides a comprehensive set of tools for code generation, file manipulation, and project management.
 
+## First Generation Architecture
+
+**This is the first generation of the Code Editor MCP Server.** Like the evolution of 3D printing technology, where early printers were used to create parts for better, more sophisticated printers, this first generation serves as the foundation for creating its own successor.
+
+Once this generation reaches a complete(ish) state, it will be used to architect and generate a second generation that will be:
+- Better written and optimized
+- More efficient in tool implementation
+- Enhanced with lessons learned from real-world usage
+- Refined through the iterative development process
+
+This evolutionary approach leverages the tools themselves to improve the tools, creating a self-improving development cycle as the MCP ecosystem and AI capabilities continue to evolve.
+
 ## Usage
 
 ### Claude Configuration
