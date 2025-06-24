@@ -16,34 +16,61 @@ public class PathService : IPathService
         _gitignorePatterns.Add(".git/");
         _ignore.Add(".git/");
         
-        // Load .gitignore if it exists
-        var gitignorePath = Path.Combine(_baseDirectory, ".gitignore");
-        if (File.Exists(gitignorePath))
+        // Load .gitignore files from current directory up to root
+        LoadGitignoreFilesUpward(_baseDirectory);
+    }
+
+    private void LoadGitignoreFilesUpward(string startDirectory)
+    {
+        var currentDirectory = Path.GetFullPath(startDirectory);
+        var visitedDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        
+        while (!string.IsNullOrEmpty(currentDirectory) && !visitedDirectories.Contains(currentDirectory))
         {
-            try
+            visitedDirectories.Add(currentDirectory);
+            
+            var gitignorePath = Path.Combine(currentDirectory, ".gitignore");
+            if (File.Exists(gitignorePath))
             {
-                var gitignoreContent = File.ReadAllLines(gitignorePath);
-                foreach (var line in gitignoreContent)
+                LoadGitignoreFile(gitignorePath);
+            }
+            
+            // Move up to parent directory
+            var parentDirectory = Directory.GetParent(currentDirectory)?.FullName;
+            if (parentDirectory == currentDirectory)
+            {
+                // We've reached the root and can't go further up
+                break;
+            }
+            currentDirectory = parentDirectory;
+        }
+    }
+
+    private void LoadGitignoreFile(string gitignorePath)
+    {
+        try
+        {
+            var gitignoreContent = File.ReadAllLines(gitignorePath);
+            foreach (var line in gitignoreContent)
+            {
+                var trimmedLine = line.Trim();
+                if (!string.IsNullOrWhiteSpace(trimmedLine) && !trimmedLine.StartsWith("#"))
                 {
-                    var trimmedLine = line.Trim();
-                    if (!string.IsNullOrWhiteSpace(trimmedLine) && !trimmedLine.StartsWith("#"))
+                    try
                     {
-                        try
-                        {
-                            _gitignorePatterns.Add(trimmedLine);
-                            _ignore.Add(trimmedLine);
-                        }
-                        catch
-                        {
-                            // Skip malformed patterns but continue with others
-                        }
+                        _gitignorePatterns.Add(trimmedLine);
+                        _ignore.Add(trimmedLine);
+                    }
+                    catch
+                    {
+                        // Skip malformed patterns but continue with others
                     }
                 }
             }
-            catch
-            {
-                // If we can't read the .gitignore file, continue with empty rules
-            }
+        }
+        catch
+        {
+            // If we can't read a .gitignore file, continue with others
         }
     }
 
