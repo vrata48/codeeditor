@@ -7,15 +7,14 @@ namespace CodeEditor.MCP.Tools;
 [McpServerToolType]
 public static class FileTools
 {
-    [McpServerTool]
+[McpServerTool]
     [Description("List files and folders.")]
     public static string[] ListFiles(
         IFileService service,
-        [Description("Path to list (default: root).")] string path = "")
+        [Description("Path to list (default: root).")] string path = ".")
     {
         return service.ListFiles(path);
-    }
-    
+    }     
     [McpServerTool]
     [Description("Read file content.")]
     public static string ReadFile(
@@ -43,17 +42,15 @@ public static class FileTools
     {
         service.DeleteFile(path);
     }
-    
-    [McpServerTool]
+[McpServerTool]
     [Description("Search for text in files.")]
     public static string[] SearchFiles(
         IFileService service,
         [Description("Text to search for.")] string text,
-        [Description("Path to search in (default: root).")] string path = "")
+        [Description("Path to search in (default: root).")] string path = ".")
     {
         return service.SearchFiles(text, path);
-    }
-    
+    }     
     [McpServerTool]
     [Description("Copy file or folder.")]
     public static void CopyFile(

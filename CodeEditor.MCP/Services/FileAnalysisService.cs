@@ -63,8 +63,7 @@ public class FileAnalysisService : IFileAnalysisService
         
         return await ReadFileLinesAsync(path, startLine, endLine);
     }
-
-    public async Task<string> SearchFilesWithContextAsync(string text, string path = "", int contextLines = 3, string filePattern = "*", int maxResults = 20)
+public async Task<string> SearchFilesWithContextAsync(string text, string path = ".", int contextLines = 3, string filePattern = "*", int maxResults = 20)
     {
         if (string.IsNullOrEmpty(text))
             throw new ArgumentException("Search text cannot be null or empty", nameof(text));
@@ -95,8 +94,7 @@ public class FileAnalysisService : IFileAnalysisService
         }
 
         return FormatSearchResults(results.Take(maxResults).ToList(), text);
-    }
-
+    } 
     public async Task<string> GetMethodSignaturesAsync(string path, string? className = null, bool includeProperties = true)
     {
         if (string.IsNullOrEmpty(path))
@@ -124,8 +122,7 @@ public class FileAnalysisService : IFileAnalysisService
             throw new InvalidOperationException($"Error analyzing method signatures in {path}: {ex.Message}", ex);
         }
     }
-
-    public async Task<string> GetFileTreeSummaryAsync(string path = "", int maxDepth = 3, string fileTypes = "", bool includeHidden = false, bool includeDetails = true, string sortBy = "name")
+public async Task<string> GetFileTreeSummaryAsync(string path = ".", int maxDepth = 3, string fileTypes = "", bool includeHidden = false, bool includeDetails = true, string sortBy = "name")
     {
         var searchPath = string.IsNullOrEmpty(path) ? Directory.GetCurrentDirectory() : _pathService.GetFullPath(path);
         
@@ -136,8 +133,7 @@ public class FileAnalysisService : IFileAnalysisService
         var dirInfo = await AnalyzeDirectoryAsync(searchPath, "", 0, maxDepth, allowedExtensions, includeHidden, includeDetails);
         
         return FormatDirectoryTree(dirInfo, includeDetails, sortBy);
-    }
-
+    } 
     // Private helper methods
     private IEnumerable<string> GetFilesToSearch(string searchPath, string filePattern)
     {
@@ -155,17 +151,10 @@ public class FileAnalysisService : IFileAnalysisService
 
         return files;
     }
-
-    private static bool ShouldIgnoreFile(string filePath)
+private bool ShouldIgnoreFile(string filePath)
     {
-        var ignorePaths = new[] { "bin", "obj", ".git", "node_modules", "packages" };
-        var ignoreExtensions = new[] { ".dll", ".exe", ".pdb", ".cache", ".tmp" };
-        
-        return ignorePaths.Any(ignore => filePath.Contains(Path.DirectorySeparatorChar + ignore + Path.DirectorySeparatorChar)) ||
-               ignoreExtensions.Any(ext => filePath.EndsWith(ext, StringComparison.OrdinalIgnoreCase));
-    }
-
-    private async Task<List<SearchResult>> SearchFileWithContextAsync(string filePath, string searchText, int contextLines)
+        return _pathService.ShouldIgnoreFileByPath(filePath);
+    } private async Task<List<SearchResult>> SearchFileWithContextAsync(string filePath, string searchText, int contextLines)
     {
         var results = new List<SearchResult>();
         var allLines = await File.ReadAllLinesAsync(filePath);
@@ -502,8 +491,7 @@ public class FileAnalysisService : IFileAnalysisService
             .Select(ext => ext.StartsWith(".") ? ext : "." + ext)
             .ToHashSet();
     }
-
-    private async Task<Models.DirectoryInfo> AnalyzeDirectoryAsync(string fullPath, string relativePath, int currentDepth, 
+private async Task<Models.DirectoryInfo> AnalyzeDirectoryAsync(string fullPath, string relativePath, int currentDepth, 
         int maxDepth, HashSet<string> allowedExtensions, bool includeHidden, bool includeDetails)
     {
         var dirInfo = new Models.DirectoryInfo
@@ -514,9 +502,9 @@ public class FileAnalysisService : IFileAnalysisService
 
         try
         {
-            // Process files
+            // Process files - use gitignore-aware filtering for tree summary
             var files = Directory.GetFiles(fullPath)
-                .Where(f => ShouldIncludeFile(f, allowedExtensions, includeHidden))
+                .Where(f => ShouldIncludeFileForTreeSummary(f, allowedExtensions, includeHidden))
                 .ToList();
 
             foreach (var file in files)
@@ -528,11 +516,11 @@ public class FileAnalysisService : IFileAnalysisService
 
             dirInfo.TotalFiles = dirInfo.Files.Count;
 
-            // Process subdirectories
+            // Process subdirectories - use gitignore-aware filtering for tree summary
             if (currentDepth < maxDepth)
             {
                 var directories = Directory.GetDirectories(fullPath)
-                    .Where(d => ShouldIncludeDirectory(d, includeHidden))
+                    .Where(d => ShouldIncludeDirectoryForTreeSummary(d, includeHidden))
                     .ToList();
 
                 foreach (var directory in directories)
@@ -551,10 +539,13 @@ public class FileAnalysisService : IFileAnalysisService
         {
             // Skip directories we can't access
         }
+        catch (DirectoryNotFoundException)
+        {
+            // Skip directories that don't exist
+        }
 
         return dirInfo;
-    }
-
+    } 
     private static async Task<Models.FileInfo> CreateFileInfoAsync(string filePath, string basePath, bool includeDetails)
     {
         var file = new System.IO.FileInfo(filePath);
@@ -587,8 +578,7 @@ public class FileAnalysisService : IFileAnalysisService
 
         return fileInfo;
     }
-
-    private static bool ShouldIncludeFile(string filePath, HashSet<string> allowedExtensions, bool includeHidden)
+private static bool ShouldIncludeFile(string filePath, HashSet<string> allowedExtensions, bool includeHidden)
     {
         var fileName = Path.GetFileName(filePath);
         
@@ -603,14 +593,10 @@ public class FileAnalysisService : IFileAnalysisService
             return allowedExtensions.Contains(extension);
         }
 
-        // Skip certain file types by default
-        var skipExtensions = new[] { ".dll", ".exe", ".pdb", ".cache", ".tmp", ".log" };
-        var fileExtension = Path.GetExtension(filePath).ToLowerInvariant();
-        
-        return !skipExtensions.Contains(fileExtension);
-    }
-
-    private static bool ShouldIncludeDirectory(string dirPath, bool includeHidden)
+        // For non-filtered extensions, we don't apply additional filtering here
+        // The gitignore filtering will be handled by the calling code
+        return true;
+    } private static bool ShouldIncludeDirectory(string dirPath, bool includeHidden)
     {
         var dirName = Path.GetFileName(dirPath);
         
@@ -618,12 +604,10 @@ public class FileAnalysisService : IFileAnalysisService
         if (!includeHidden && dirName.StartsWith("."))
             return false;
 
-        // Skip common ignore directories
-        var ignoreDirs = new[] { "bin", "obj", "node_modules", "packages", ".git", ".vs", ".vscode" };
-        return !ignoreDirs.Contains(dirName.ToLowerInvariant());
-    }
-
-    private static bool IsTextFile(string extension)
+        // For basic directory inclusion, we don't apply filtering here
+        // The gitignore filtering will be handled by the calling code  
+        return true;
+    } private static bool IsTextFile(string extension)
     {
         var textExtensions = new[] { ".cs", ".js", ".ts", ".json", ".xml", ".txt", ".md", ".yml", ".yaml", 
             ".css", ".html", ".htm", ".sql", ".config", ".csproj", ".sln", ".gitignore" };
@@ -724,4 +708,35 @@ public class FileAnalysisService : IFileAnalysisService
         
         return $"{size:0.##} {sizes[order]}";
     }
-}
+private bool ShouldIncludeDirectoryForTreeSummary(string dirPath, bool includeHidden)
+    {
+        var dirName = Path.GetFileName(dirPath);
+        
+        // Check hidden directories
+        if (!includeHidden && dirName.StartsWith("."))
+            return false;
+
+        // Use centralized path filtering logic
+        return !_pathService.ShouldIgnoreDirectoryByPath(dirPath);
+    } private bool ShouldIncludeFileForTreeSummary(string filePath, HashSet<string> allowedExtensions, bool includeHidden)
+    {
+        var fileName = Path.GetFileName(filePath);
+        
+        // Check hidden files
+        if (!includeHidden && fileName.StartsWith("."))
+            return false;
+
+        // Use centralized path filtering logic
+        if (_pathService.ShouldIgnoreFileByPath(filePath))
+            return false;
+
+        // Check file extension filter
+        if (allowedExtensions.Any())
+        {
+            var extension = Path.GetExtension(filePath).ToLowerInvariant();
+            return allowedExtensions.Contains(extension);
+        }
+
+        // No additional filtering needed - PathService handles all ignore logic
+        return true;
+    } }

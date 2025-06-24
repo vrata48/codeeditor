@@ -4,31 +4,26 @@ namespace CodeEditor.MCP.Services;
 
 public class FileService(IFileSystem fileSystem, IPathService pathService) : IFileService
 {
-    public string[] ListFiles(string relativePath = "")
+public string[] ListFiles(string relativePath = ".")
     {
         var fullPath = pathService.GetFullPath(relativePath);
-        var files = fileSystem.Directory.GetFileSystemEntries(fullPath, "*", SearchOption.AllDirectories);
-        var baseDir = pathService.GetBaseDirectory();
+        var entries = fileSystem.Directory.GetFileSystemEntries(fullPath, "*", SearchOption.AllDirectories);
         
-        var relativePaths = files.Select(f => 
+        // Convert to relative paths with proper normalization
+        var relativePaths = entries.Select(entry => 
         {
-            var relPath = Path.GetRelativePath(baseDir, f);
-            // Normalize path separators to forward slashes for gitignore compatibility
-            relPath = relPath.Replace(Path.DirectorySeparatorChar, '/');
-            
-            // Append trailing slash for directories to match gitignore directory patterns
-            if (fileSystem.Directory.Exists(f))
+            var relPath = pathService.GetRelativePath(entry);
+            // Add trailing slash for directories
+            if (fileSystem.Directory.Exists(entry) && !relPath.EndsWith("/"))
             {
                 relPath += "/";
             }
-            
             return relPath;
         });
         
+        // Apply gitignore filtering - this is the core requirement
         return pathService.FilterIgnored(relativePaths).ToArray();
-    }
-    
-    public string ReadFile(string relativePath)
+    } public string ReadFile(string relativePath)
     {
         var fullPath = pathService.GetFullPath(relativePath);
         return fileSystem.File.ReadAllText(fullPath);
@@ -49,34 +44,39 @@ public class FileService(IFileSystem fileSystem, IPathService pathService) : IFi
         else if (fileSystem.Directory.Exists(fullPath))
             fileSystem.Directory.Delete(fullPath, true);
     }
-    
-    public string[] SearchFiles(string searchText, string relativePath = "")
+public string[] SearchFiles(string searchText, string relativePath = ".")
     {
-        var files = ListFiles(relativePath).Where(f => 
-        {
-            // Remove trailing slash for file existence check
-            var pathForCheck = f.TrimEnd('/');
-            return fileSystem.File.Exists(pathService.GetFullPath(pathForCheck));
-        });
-        var matches = new List<string>();
+        var fullPath = pathService.GetFullPath(relativePath);
+        var allFiles = fileSystem.Directory.GetFileSystemEntries(fullPath, "*", SearchOption.AllDirectories);
+        var results = new List<string>();
         
-        foreach (var file in files)
+        foreach (var fullFilePath in allFiles)
         {
+            // Skip directories
+            if (fileSystem.Directory.Exists(fullFilePath))
+                continue;
+                
+            // Check if this file should be ignored
+            var relativeFilePath = pathService.GetRelativePath(fullFilePath);
+            if (pathService.ShouldIgnore(relativeFilePath))
+                continue;
+                
             try
             {
-                // Remove trailing slash for file reading
-                var pathForReading = file.TrimEnd('/');
-                var content = ReadFile(pathForReading);
+                var content = fileSystem.File.ReadAllText(fullFilePath);
                 if (content.Contains(searchText, StringComparison.OrdinalIgnoreCase))
-                    matches.Add(file);
+                {
+                    results.Add(relativeFilePath.Replace('\\', '/'));
+                }
             }
-            catch { }
+            catch
+            {
+                // Skip files that can't be read
+            }
         }
         
-        return matches.ToArray();
-    }
-    
-    public void CopyFile(string sourceRelativePath, string destinationRelativePath)
+        return results.ToArray();
+    } public void CopyFile(string sourceRelativePath, string destinationRelativePath)
     {
         var sourcePath = pathService.GetFullPath(sourceRelativePath);
         var destPath = pathService.GetFullPath(destinationRelativePath);

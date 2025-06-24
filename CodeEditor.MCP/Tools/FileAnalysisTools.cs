@@ -28,20 +28,18 @@ public static class FileAnalysisTools
     {
         return await fileAnalysisService.ReadAroundLineAsync(path, centerLine, contextLines);
     }
-
-    [McpServerTool]
+[McpServerTool]
     [Description("Search for text in files with surrounding context")]
     public static async Task<string> SearchFilesWithContext(
         IFileAnalysisService fileAnalysisService,
         [Description("Text to search for")] string text,
-        [Description("Path to search in (default: root)")] string path = "",
+        [Description("Path to search in (default: root)")] string path = ".",
         [Description("Number of lines to include before and after match")] int contextLines = 3,
         [Description("File pattern filter (e.g., \"*.cs\")")] string filePattern = "*",
         [Description("Maximum number of results to return")] int maxResults = 20)
     {
         return await fileAnalysisService.SearchFilesWithContextAsync(text, path, contextLines, filePattern, maxResults);
-    }
-
+    } 
     [McpServerTool]
     [Description("Get method signatures from C# files without implementation details")]
     public static async Task<string> GetMethodSignatures(
@@ -52,12 +50,11 @@ public static class FileAnalysisTools
     {
         return await fileAnalysisService.GetMethodSignaturesAsync(path, className, includeProperties);
     }
-
-    [McpServerTool]
+[McpServerTool]
     [Description("Generate structured directory overview with filtering")]
     public static async Task<string> FileTreeSummary(
         IFileAnalysisService fileAnalysisService,
-        [Description("Path to analyze (default: root)")] string path = "",
+        [Description("Path to analyze (default: root)")] string path = ".",
         [Description("Maximum directory depth to traverse")] int maxDepth = 3,
         [Description("File extensions to include (e.g., \"cs,json,md\")")] string fileTypes = "",
         [Description("Include hidden files and directories")] bool includeHidden = false,
@@ -65,5 +62,4 @@ public static class FileAnalysisTools
         [Description("Sort files by: name, size, modified, extension")] string sortBy = "name")
     {
         return await fileAnalysisService.GetFileTreeSummaryAsync(path, maxDepth, fileTypes, includeHidden, includeDetails, sortBy);
-    }
-}
+    } }
