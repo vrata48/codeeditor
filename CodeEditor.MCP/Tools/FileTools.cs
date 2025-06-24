@@ -1,20 +1,23 @@
 using System.ComponentModel;
 using CodeEditor.MCP.Services;
+using CodeEditor.MCP.Aspects;
 using ModelContextProtocol.Server;
 
 namespace CodeEditor.MCP.Tools;
 
 [McpServerToolType]
+[ToolLoggingAspect] // Apply logging aspect to all methods in this class
 public static class FileTools
 {
-[McpServerTool]
+    [McpServerTool]
     [Description("List files and folders.")]
     public static string[] ListFiles(
         IFileService service,
         [Description("Path to list (default: root).")] string path = ".")
     {
         return service.ListFiles(path);
-    }     
+    }
+    
     [McpServerTool]
     [Description("Read file content.")]
     public static string ReadFile(
@@ -42,7 +45,8 @@ public static class FileTools
     {
         service.DeleteFile(path);
     }
-[McpServerTool]
+    
+    [McpServerTool]
     [Description("Search for text in files.")]
     public static string[] SearchFiles(
         IFileService service,
@@ -50,7 +54,8 @@ public static class FileTools
         [Description("Path to search in (default: root).")] string path = ".")
     {
         return service.SearchFiles(text, path);
-    }     
+    }
+    
     [McpServerTool]
     [Description("Copy file or folder.")]
     public static void CopyFile(
@@ -70,7 +75,8 @@ public static class FileTools
     {
         service.MoveFile(source, destination);
     }
-[McpServerTool]
+    
+    [McpServerTool]
     [Description("Show current file filter settings.")]
     public static string GetFilterInfo(IFileFilterService filterService)
     {
@@ -80,4 +86,5 @@ public static class FileTools
             return "No file filter is currently active. All files (except those in .gitignore) are included.";
         }
         return $"Active file filter: {filter}";
-    } }
+    }
+}

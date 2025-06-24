@@ -7,4 +7,4 @@ public class TestResult : BuildResult
     public int TestsSkipped { get; set; }
     public int TotalTests { get; set; }
     public List<FailedTest> FailedTests { get; set; } = new();
-}
+public int Passed => TestsPassed; public int Failed => TestsFailed; public int Skipped => TestsSkipped; }

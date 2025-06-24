@@ -1,9 +1,12 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using CodeEditor.MCP.Services;
+using CodeEditor.MCP.Aspects;
 using ModelContextProtocol.Server;
 
 namespace CodeEditor.MCP.Tools;
+
 [McpServerToolType]
+[ToolLoggingAspect] // Apply logging aspect to all methods in this class
 public static class CSharpTools
 {
     [McpServerTool]

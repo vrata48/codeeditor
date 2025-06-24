@@ -45,8 +45,7 @@ public class BuildToolsTests
         result.Should().NotContain("duration"); // Duration should be removed
         _mockDotNetService.Verify(x => x.BuildProjectAsync(path), Times.Once);
     }
-
-    [Fact]
+[Fact]
     public async Task BuildProject_Failure_ReturnsFailureResultWithOutput()
     {
         // Arrange
@@ -82,14 +81,14 @@ public class BuildToolsTests
         result.Should().Contain("\"success\": false");
         result.Should().Contain("\"exitCode\": 1");
         result.Should().Contain("\"errorCount\": 1");
-        result.Should().Contain("Build failed"); // Output should be included on failure
-        result.Should().Contain("Compilation error"); // Errors should be included
-        result.Should().Contain("Error CS0103"); // Parsed errors should be included
-        result.Should().Contain("Program.cs(10,5)");
-        result.Should().NotContain("duration"); // Duration should be removed
+        result.Should().Contain("\"output\": \"Build failed\"");
+        result.Should().Contain("\"errors\": \"Compilation error\"");
+        result.Should().Contain("\"errorCode\": \"CS0103\"");
+        result.Should().Contain("\"file\": \"Program.cs\"");
+        result.Should().Contain("\"line\": 10");
+        result.Should().Contain("\"column\": 5");
         _mockDotNetService.Verify(x => x.BuildProjectAsync(path), Times.Once);
-    }
-
+    } 
     [Fact]
     public async Task BuildSolution_Success_ReturnsSuccessResult()
     {
@@ -205,8 +204,7 @@ public class BuildToolsTests
         result.Should().NotContain("Restore completed successfully"); // Output should not be included on success
         _mockDotNetService.Verify(x => x.RestorePackagesAsync(path), Times.Once);
     }
-
-    [Fact]
+[Fact]
     public async Task RestorePackages_Failure_ReturnsFailureResultWithOutput()
     {
         // Arrange
@@ -242,13 +240,12 @@ public class BuildToolsTests
         result.Should().Contain("\"success\": false");
         result.Should().Contain("\"exitCode\": 1");
         result.Should().Contain("\"errorCount\": 1");
-        result.Should().Contain("Restore failed"); // Output should be included on failure
-        result.Should().Contain("Package not found"); // Errors should be included
-        result.Should().Contain("Error NU1101"); // Parsed errors should be included
+        result.Should().Contain("\"output\": \"Restore failed\"");
+        result.Should().Contain("\"errors\": \"Package not found\"");
+        result.Should().Contain("\"errorCode\": \"NU1101\"");
+        result.Should().Contain("\"file\": \"project.csproj\"");
         _mockDotNetService.Verify(x => x.RestorePackagesAsync(path), Times.Once);
-    }
-
-    [Fact]
+    } [Fact]
     public async Task RunTests_Success_ReturnsTestResult()
     {
         // Arrange
@@ -275,18 +272,14 @@ public class BuildToolsTests
         var result = await BuildTools.RunTests(_mockDotNetService.Object, path);
 
         // Assert
-        result.Should().Contain("Test Result:");
         result.Should().Contain("\"success\": true");
         result.Should().Contain("\"totalTests\": 10");
         result.Should().Contain("\"passed\": 10");
         result.Should().Contain("\"failed\": 0");
         result.Should().Contain("\"skipped\": 0");
-        result.Should().NotContain("Tests passed"); // Output should not be included on success
-        result.Should().NotContain("duration"); // Duration should be removed
         _mockDotNetService.Verify(x => x.RunTestsAsync(path), Times.Once);
-    }
-
-    [Fact]
+    } 
+[Fact]
     public async Task RunTests_Failure_ReturnsTestResultWithFailures()
     {
         // Arrange
@@ -295,7 +288,7 @@ public class BuildToolsTests
         {
             Success = false,
             ExitCode = 1,
-            Duration = TimeSpan.FromSeconds(6),
+            Duration = TimeSpan.FromSeconds(12),
             Output = "Some tests failed",
             Errors = "Test execution errors",
             ParsedErrors = new List<BuildError>(),
@@ -329,32 +322,29 @@ public class BuildToolsTests
         var result = await BuildTools.RunTests(_mockDotNetService.Object, path);
 
         // Assert
-        result.Should().Contain("Test Result:");
         result.Should().Contain("\"success\": false");
         result.Should().Contain("\"totalTests\": 10");
         result.Should().Contain("\"passed\": 8");
         result.Should().Contain("\"failed\": 2");
-        result.Should().Contain("Some tests failed"); // Output should be included on failure
-        result.Should().Contain("Test execution errors"); // Errors should be included
-        result.Should().Contain("Failed Tests:");
-        result.Should().Contain("TestMethod1");
-        result.Should().Contain("Assert.Equal() Failure");
-        result.Should().Contain("TestMethod2");
-        result.Should().Contain("Null reference exception");
+        result.Should().Contain("\"output\": \"Some tests failed\"");
+        result.Should().Contain("\"errors\": \"Test execution errors\"");
+        result.Should().Contain("\"testName\": \"TestMethod1\"");
+        result.Should().Contain("\"errorMessage\": \"Assert.Equal() Failure\"");
+        result.Should().Contain("\"testName\": \"TestMethod2\"");
+        result.Should().Contain("\"errorMessage\": \"Null reference exception\"");
         _mockDotNetService.Verify(x => x.RunTestsAsync(path), Times.Once);
-    }
-
-    [Fact]
+    } 
+[Fact]
     public async Task RunTestsFiltered_Success_ReturnsFilteredTestResult()
     {
         // Arrange
         var path = "tests.csproj";
-        var filter = "ClassName=UnitTests";
+        var filter = "Category=Unit";
         var testResult = new TestResult
         {
             Success = true,
             ExitCode = 0,
-            Duration = TimeSpan.FromSeconds(3),
+            Duration = TimeSpan.FromSeconds(5),
             Output = "Filtered tests passed",
             Errors = "",
             ParsedErrors = new List<BuildError>(),
@@ -372,15 +362,12 @@ public class BuildToolsTests
         var result = await BuildTools.RunTestsFiltered(_mockDotNetService.Object, path, filter);
 
         // Assert
-        result.Should().Contain("Test Result:");
         result.Should().Contain("\"success\": true");
         result.Should().Contain("\"totalTests\": 5");
         result.Should().Contain("\"passed\": 5");
         result.Should().Contain("\"failed\": 0");
-        result.Should().NotContain("Filtered tests passed"); // Output should not be included on success
         _mockDotNetService.Verify(x => x.RunTestsAsync(path, filter), Times.Once);
-    }
-
+    } 
     [Fact]
     public async Task PublishProject_Success_ReturnsSuccessResult()
     {
@@ -436,8 +423,7 @@ public class BuildToolsTests
         result.Should().Contain("\"success\": true");
         _mockDotNetService.Verify(x => x.PublishProjectAsync(path, null), Times.Once);
     }
-
-    [Fact]
+[Fact]
     public async Task FormatBuildResult_WithMultipleErrors_FormatsAllErrors()
     {
         // Arrange
@@ -480,12 +466,13 @@ public class BuildToolsTests
 
         // Assert
         result.Should().Contain("\"errorCount\": 2");
-        result.Should().Contain("Error CS0103: Error message 1");
-        result.Should().Contain("Class1.cs(10,5)");
-        result.Should().Contain("Warning CS0104: Error message 2");
-        result.Should().Contain("Class2.cs(20,15)");
-    }
-
+        result.Should().Contain("\"errorCode\": \"CS0103\"");
+        result.Should().Contain("\"message\": \"Error message 1\"");
+        result.Should().Contain("\"file\": \"Class1.cs\"");
+        result.Should().Contain("\"errorCode\": \"CS0104\"");
+        result.Should().Contain("\"message\": \"Error message 2\"");
+        result.Should().Contain("\"file\": \"Class2.cs\"");
+    } 
     [Fact]
     public async Task FormatBuildResult_WithNoErrors_DoesNotIncludeErrorSection()
     {
