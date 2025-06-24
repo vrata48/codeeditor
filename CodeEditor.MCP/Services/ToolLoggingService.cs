@@ -13,8 +13,7 @@ public class ToolLoggingService : IToolLoggingService
         _logDirectory = Path.Combine(_pathService.GetBaseDirectory(), ".mcp-logs");
         Directory.CreateDirectory(_logDirectory);
     }
-
-    public void LogFailedToolCall(string toolName, string methodName, object? request, Exception exception)
+public void LogFailedToolCall(string toolName, string methodName, object? request, Exception exception)
     {
         var logEntry = new
         {
@@ -25,31 +24,51 @@ public class ToolLoggingService : IToolLoggingService
             Exception = new
             {
                 Type = exception.GetType().FullName,
-                Message = exception.Message,
-                StackTrace = exception.StackTrace,
-                InnerException = exception.InnerException?.Message
+                Message = exception.Message
             }
         };
 
         try
         {
-            var logFile = Path.Combine(_logDirectory, $"failed-tools-{DateTime.UtcNow:yyyy-MM-dd}.jsonl");
-            var logJson = JsonSerializer.Serialize(logEntry, new JsonSerializerOptions 
+            var logFile = Path.Combine(_logDirectory, $"failed-tools-{DateTime.UtcNow:yyyy-MM-dd}.json");
+            
+            List<object> logEntries;
+            
+            // Read existing log entries if file exists
+            if (File.Exists(logFile))
+            {
+                var existingContent = File.ReadAllText(logFile);
+                if (!string.IsNullOrWhiteSpace(existingContent))
+                {
+                    logEntries = JsonSerializer.Deserialize<List<object>>(existingContent) ?? new List<object>();
+                }
+                else
+                {
+                    logEntries = new List<object>();
+                }
+            }
+            else
+            {
+                logEntries = new List<object>();
+            }
+            
+            // Add new entry
+            logEntries.Add(logEntry);
+            
+            // Write back as JSON array
+            var logJson = JsonSerializer.Serialize(logEntries, new JsonSerializerOptions 
             { 
-                WriteIndented = false,
+                WriteIndented = true,
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase
             });
 
-            // Use JSONL format (one JSON object per line) for easy processing
-            File.AppendAllText(logFile, logJson + Environment.NewLine);
+            File.WriteAllText(logFile, logJson);
         }
         catch
         {
             // Swallow logging errors to avoid interfering with the main application
         }
-    }
-
-    private static object? SanitizeRequest(object? request)
+    }     private static object? SanitizeRequest(object? request)
     {
         if (request == null) return null;
 
