@@ -19,15 +19,14 @@ public class FileServiceTests : IDisposable
         Directory.CreateDirectory(_testProjectDirectory);
         SetupServices();
     }
-
-    private void SetupServices()
+private void SetupServices()
     {
         _pathService = new PathService(_testProjectDirectory);
         _fileSystem = new MockFileSystem();
         _fileSystem.AddDirectory(_testProjectDirectory);
-        _fileService = new FileService(_fileSystem, _pathService);
-    }
-
+        var fileFilterService = new FileFilterService(_pathService, null);
+        _fileService = new FileService(_fileSystem, _pathService, fileFilterService);
+    } 
     public void Dispose()
     {
         if (Directory.Exists(_tempDirectory))

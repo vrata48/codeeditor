@@ -70,4 +70,14 @@ public static class FileTools
     {
         service.MoveFile(source, destination);
     }
-}
+[McpServerTool]
+    [Description("Show current file filter settings.")]
+    public static string GetFilterInfo(IFileFilterService filterService)
+    {
+        var filter = filterService.GlobalFilter;
+        if (string.IsNullOrEmpty(filter))
+        {
+            return "No file filter is currently active. All files (except those in .gitignore) are included.";
+        }
+        return $"Active file filter: {filter}";
+    } }

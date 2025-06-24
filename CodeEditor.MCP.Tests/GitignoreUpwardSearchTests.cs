@@ -31,14 +31,13 @@ public class GitignoreUpwardSearchTests : IDisposable
             Directory.Delete(_tempDirectory, true);
         }
     }
-
-    private void CreateServicesFromDirectory(string workingDirectory)
+private void CreateServicesFromDirectory(string workingDirectory)
     {
         _pathService = new PathService(workingDirectory);
         _fileSystem = new System.IO.Abstractions.FileSystem();
-        _fileService = new FileService(_fileSystem, _pathService);
-    }
-
+        var fileFilterService = new FileFilterService(_pathService, null);
+        _fileService = new FileService(_fileSystem, _pathService, fileFilterService);
+    } 
     private void CreateTestFile(string relativePath, string content)
     {
         var fullPath = Path.Combine(_rootProjectDirectory, relativePath);

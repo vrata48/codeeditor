@@ -6,7 +6,7 @@ namespace CodeEditor.MCP.Tests;
 
 public class FileTreeSummaryBasicTests
 {
-    [Fact]
+[Fact]
     public async Task FileTreeSummary_WithBasicStructure_WorksCorrectly()
     {
         // Arrange
@@ -21,7 +21,8 @@ public class FileTreeSummaryBasicTests
             File.WriteAllText(Path.Combine(tempDir, "src", "program.cs"), "// Program");
             
             var pathService = new PathService(tempDir);
-            var fileAnalysisService = new FileAnalysisService(pathService);
+            var fileFilterService = new FileFilterService(pathService, null);
+            var fileAnalysisService = new FileAnalysisService(pathService, fileFilterService);
 
             // Act
             var result = await fileAnalysisService.GetFileTreeSummaryAsync(".", 2, "cs", false, true, "name");
@@ -36,5 +37,4 @@ public class FileTreeSummaryBasicTests
             if (Directory.Exists(tempDir))
                 Directory.Delete(tempDir, true);
         }
-    }
-}
+    } }

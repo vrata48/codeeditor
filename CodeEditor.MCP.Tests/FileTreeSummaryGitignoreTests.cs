@@ -26,14 +26,13 @@ public class FileTreeSummaryGitignoreTests : IDisposable
             Directory.Delete(_tempDirectory, true);
         }
     }
-
-    private void CreateServicesAfterGitignore()
+private void CreateServicesAfterGitignore()
     {
         _pathService = new PathService(_testProjectDirectory);
         _fileSystem = new System.IO.Abstractions.FileSystem();
-        _fileAnalysisService = new FileAnalysisService(_pathService);
-    }
-
+        var fileFilterService = new FileFilterService(_pathService, null);
+        _fileAnalysisService = new FileAnalysisService(_pathService, fileFilterService);
+    } 
     private void CreateTestFile(string relativePath, string content)
     {
         var fullPath = Path.Combine(_testProjectDirectory, relativePath);

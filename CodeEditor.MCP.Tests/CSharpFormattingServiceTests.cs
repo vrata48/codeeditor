@@ -1,4 +1,4 @@
-﻿using System.IO.Abstractions.TestingHelpers;
+using System.IO.Abstractions.TestingHelpers;
 using CodeEditor.MCP.Services;
 using FluentAssertions;
 using Microsoft.CodeAnalysis.CSharp;
@@ -19,16 +19,15 @@ public class CSharpFormattingServiceTests : IDisposable
         Directory.CreateDirectory(_testProjectDirectory);
         SetupServices();
     }
-
-    private void SetupServices()
+private void SetupServices()
     {
         _pathService = new PathService(_testProjectDirectory);
         _fileSystem = new MockFileSystem();
         _fileSystem.AddDirectory(_testProjectDirectory);
-        _fileService = new FileService(_fileSystem, _pathService);
+        var fileFilterService = new FileFilterService(_pathService, null);
+        _fileService = new FileService(_fileSystem, _pathService, fileFilterService);
         _formattingService = new CSharpFormattingService(_fileService, _pathService, _fileSystem);
-    }
-
+    } 
     public void Dispose()
     {
         if (Directory.Exists(_tempDirectory))

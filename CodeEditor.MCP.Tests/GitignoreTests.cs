@@ -25,14 +25,13 @@ public class GitignoreTests : IDisposable
             Directory.Delete(_tempDirectory, true);
         }
     }
-
-    private void CreateServicesAfterGitignore()
+private void CreateServicesAfterGitignore()
     {
         _pathService = new PathService(_testProjectDirectory);
         _fileSystem = new System.IO.Abstractions.FileSystem();
-        _fileService = new FileService(_fileSystem, _pathService);
-    }
-
+        var fileFilterService = new FileFilterService(_pathService, null);
+        _fileService = new FileService(_fileSystem, _pathService, fileFilterService);
+    } 
     [Fact]
     public void ListFiles_WithoutGitignore_ReturnsAllFiles()
     {

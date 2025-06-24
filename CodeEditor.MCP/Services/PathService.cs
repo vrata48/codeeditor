@@ -294,4 +294,60 @@ public string GetRelativePath(string fullPath)
         var relativePath = GetRelativePath(fullPath);
         return ShouldIgnoreDirectory(relativePath);
     }
-}
+public bool MatchesFilter(string relativePath, string? filterPatterns)
+    {
+        if (string.IsNullOrEmpty(filterPatterns))
+            return true;
+
+        var patterns = filterPatterns.Split(',', StringSplitOptions.RemoveEmptyEntries)
+            .Select(p => p.Trim())
+            .ToArray();
+
+        var fileName = Path.GetFileName(relativePath);
+        var extension = Path.GetExtension(relativePath);
+
+        foreach (var pattern in patterns)
+        {
+            if (string.IsNullOrEmpty(pattern))
+                continue;
+
+            // Handle patterns like *.cs, *.json, etc.
+            if (pattern.StartsWith("*."))
+            {
+                var patternExtension = pattern.Substring(1); // Remove the *
+                if (extension.Equals(patternExtension, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+            // Handle exact file name matches
+            else if (fileName.Equals(pattern, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+            // Handle wildcard patterns (basic glob matching)
+            else if (pattern.Contains('*') || pattern.Contains('?'))
+            {
+                var regex = WildcardToRegex(pattern);
+                if (System.Text.RegularExpressions.Regex.IsMatch(fileName, regex, System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                    return true;
+            }
+            // Handle directory patterns
+            else if (relativePath.Contains(pattern, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    } public IEnumerable<string> FilterByPatterns(IEnumerable<string> relativePaths, string? filterPatterns)
+    {
+        if (string.IsNullOrEmpty(filterPatterns))
+            return relativePaths;
+
+        return relativePaths.Where(path => MatchesFilter(path, filterPatterns));
+    } private static string WildcardToRegex(string pattern)
+    {
+        var regex = System.Text.RegularExpressions.Regex.Escape(pattern)
+            .Replace("\\*", ".*")
+            .Replace("\\?", ".");
+        return "^" + regex + "$";
+    } }

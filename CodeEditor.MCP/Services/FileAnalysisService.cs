@@ -7,69 +7,73 @@ namespace CodeEditor.MCP.Services;
 public class FileAnalysisService : IFileAnalysisService
 {
     private readonly IPathService _pathService;
+    private readonly IFileFilterService _fileFilterService;
 
-    public FileAnalysisService(IPathService pathService)
+    public FileAnalysisService(IPathService pathService, IFileFilterService fileFilterService)
     {
         _pathService = pathService;
+        _fileFilterService = fileFilterService;
     }
 
     public async Task<string> ReadFileLinesAsync(string path, int startLine, int endLine)
     {
         if (string.IsNullOrEmpty(path))
             throw new ArgumentException("Path cannot be null or empty", nameof(path));
-        
+
         if (startLine < 1)
-            throw new ArgumentException("Start line must be >= 1", nameof(startLine));
-        
+            throw new ArgumentException("Start line must be greater than 0", nameof(startLine));
+
         if (endLine < startLine)
-            throw new ArgumentException("End line must be >= start line", nameof(endLine));
+            throw new ArgumentException("End line must be greater than or equal to start line", nameof(endLine));
 
         var fullPath = _pathService.GetFullPath(path);
         if (!File.Exists(fullPath))
-            throw new FileNotFoundException($"File not found: {path}");
+            throw new FileNotFoundException($"File not found: {fullPath}");
 
-        try
+        var lines = await File.ReadAllLinesAsync(fullPath);
+        
+        if (startLine > lines.Length)
+            throw new ArgumentException($"Start line {startLine} exceeds file length {lines.Length}", nameof(startLine));
+
+        var adjustedEndLine = Math.Min(endLine, lines.Length);
+        var selectedLines = lines.Skip(startLine - 1).Take(adjustedEndLine - startLine + 1);
+        
+        var result = new StringBuilder();
+        var currentLine = startLine;
+        
+        foreach (var line in selectedLines)
         {
-            var allLines = await File.ReadAllLinesAsync(fullPath);
-            
-            // Adjust for 0-based indexing
-            var startIndex = startLine - 1;
-            var endIndex = Math.Min(endLine - 1, allLines.Length - 1);
-            
-            if (startIndex >= allLines.Length)
-                return $"// File only has {allLines.Length} lines, cannot read from line {startLine}";
-            
-            var selectedLines = allLines
-                .Skip(startIndex)
-                .Take(endIndex - startIndex + 1)
-                .ToArray();
-            
-            var result = string.Join(Environment.NewLine, selectedLines);
-            
-            // Add context information
-            var header = $"// Lines {startLine}-{Math.Min(endLine, allLines.Length)} of {allLines.Length} total lines from {path}";
-            return $"{header}{Environment.NewLine}{result}";
+            result.AppendLine($"{currentLine:D4}: {line}");
+            currentLine++;
         }
-        catch (Exception ex)
-        {
-            throw new InvalidOperationException($"Error reading lines from {path}: {ex.Message}", ex);
-        }
+
+        return result.ToString();
     }
 
     public async Task<string> ReadAroundLineAsync(string path, int centerLine, int contextLines = 5)
     {
+        if (string.IsNullOrEmpty(path))
+            throw new ArgumentException("Path cannot be null or empty", nameof(path));
+
+        if (centerLine < 1)
+            throw new ArgumentException("Center line must be greater than 0", nameof(centerLine));
+
+        if (contextLines < 0)
+            throw new ArgumentException("Context lines cannot be negative", nameof(contextLines));
+
         var startLine = Math.Max(1, centerLine - contextLines);
         var endLine = centerLine + contextLines;
-        
+
         return await ReadFileLinesAsync(path, startLine, endLine);
     }
-public async Task<string> SearchFilesWithContextAsync(string text, string path = ".", int contextLines = 3, string filePattern = "*", int maxResults = 20)
+
+    public async Task<string> SearchFilesWithContextAsync(string text, string path = ".", int contextLines = 3, string filePattern = "*", int maxResults = 20)
     {
         if (string.IsNullOrEmpty(text))
             throw new ArgumentException("Search text cannot be null or empty", nameof(text));
 
         var searchPath = string.IsNullOrEmpty(path) ? Directory.GetCurrentDirectory() : _pathService.GetFullPath(path);
-        
+
         if (!Directory.Exists(searchPath) && !File.Exists(searchPath))
             throw new DirectoryNotFoundException($"Path not found: {searchPath}");
 
@@ -94,47 +98,39 @@ public async Task<string> SearchFilesWithContextAsync(string text, string path =
         }
 
         return FormatSearchResults(results.Take(maxResults).ToList(), text);
-    } 
+    }
+
     public async Task<string> GetMethodSignaturesAsync(string path, string? className = null, bool includeProperties = true)
     {
         if (string.IsNullOrEmpty(path))
             throw new ArgumentException("Path cannot be null or empty", nameof(path));
 
-        if (!path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
-            throw new ArgumentException("File must be a C# file (.cs)", nameof(path));
-
         var fullPath = _pathService.GetFullPath(path);
         if (!File.Exists(fullPath))
-            throw new FileNotFoundException($"File not found: {path}");
+            throw new FileNotFoundException($"File not found: {fullPath}");
 
-        try
-        {
-            var content = await File.ReadAllTextAsync(fullPath);
-            var lines = content.Split('\n');
-            
-            var methods = ExtractMethodSignatures(content, lines, className);
-            var properties = includeProperties ? ExtractPropertySignatures(content, lines, className) : new List<PropertySignature>();
-            
-            return FormatSignatureOutput(path, methods, properties, className);
-        }
-        catch (Exception ex)
-        {
-            throw new InvalidOperationException($"Error analyzing method signatures in {path}: {ex.Message}", ex);
-        }
+        var content = await File.ReadAllTextAsync(fullPath);
+        var lines = content.Split('\n');
+
+        var methods = ExtractMethodSignatures(lines, className);
+        var properties = includeProperties ? ExtractPropertySignatures(lines, className) : new List<PropertySignature>();
+
+        return FormatSignatureOutput(methods, properties, className);
     }
-public async Task<string> GetFileTreeSummaryAsync(string path = ".", int maxDepth = 3, string fileTypes = "", bool includeHidden = false, bool includeDetails = true, string sortBy = "name")
+
+    public async Task<string> GetFileTreeSummaryAsync(string path = ".", int maxDepth = 3, string fileTypes = "", bool includeHidden = false, bool includeDetails = true, string sortBy = "name")
     {
         var searchPath = string.IsNullOrEmpty(path) ? Directory.GetCurrentDirectory() : _pathService.GetFullPath(path);
-        
+
         if (!Directory.Exists(searchPath))
             throw new DirectoryNotFoundException($"Directory not found: {searchPath}");
 
         var allowedExtensions = ParseFileTypes(fileTypes);
         var dirInfo = await AnalyzeDirectoryAsync(searchPath, "", 0, maxDepth, allowedExtensions, includeHidden, includeDetails);
-        
+
         return FormatDirectoryTree(dirInfo, includeDetails, sortBy);
-    } 
-    // Private helper methods
+    }
+
     private IEnumerable<string> GetFilesToSearch(string searchPath, string filePattern)
     {
         if (File.Exists(searchPath))
@@ -151,49 +147,55 @@ public async Task<string> GetFileTreeSummaryAsync(string path = ".", int maxDept
 
         return files;
     }
-private bool ShouldIgnoreFile(string filePath)
+
+    private bool ShouldIgnoreFile(string filePath)
     {
-        return _pathService.ShouldIgnoreFileByPath(filePath);
-    } private async Task<List<SearchResult>> SearchFileWithContextAsync(string filePath, string searchText, int contextLines)
+        var relativePath = _pathService.GetRelativePath(filePath);
+        return !_fileFilterService.ShouldInclude(relativePath);
+    }
+
+    private async Task<List<SearchResult>> SearchFileWithContextAsync(string filePath, string searchText, int contextLines)
     {
         var results = new List<SearchResult>();
-        var allLines = await File.ReadAllLinesAsync(filePath);
-        
-        for (int i = 0; i < allLines.Length; i++)
+        var lines = await File.ReadAllLinesAsync(filePath);
+        var relativePath = _pathService.GetRelativePath(filePath);
+
+        for (int i = 0; i < lines.Length; i++)
         {
-            var line = allLines[i];
-            if (line.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+            if (lines[i].Contains(searchText, StringComparison.OrdinalIgnoreCase))
             {
-                var result = new SearchResult
+                var startLine = Math.Max(0, i - contextLines);
+                var endLine = Math.Min(lines.Length - 1, i + contextLines);
+                
+                var contextBefore = new List<string>();
+                var contextAfter = new List<string>();
+                
+                for (int j = startLine; j < i; j++)
                 {
-                    FilePath = Path.GetRelativePath(Directory.GetCurrentDirectory(), filePath),
+                    contextBefore.Add($"{j + 1:D4}: {lines[j]}");
+                }
+                
+                for (int j = i + 1; j <= endLine; j++)
+                {
+                    contextAfter.Add($"{j + 1:D4}: {lines[j]}");
+                }
+
+                results.Add(new SearchResult
+                {
+                    FilePath = relativePath,
                     LineNumber = i + 1,
-                    MatchLine = line.Trim(),
+                    MatchLine = lines[i],
+                    ContextBefore = contextBefore,
+                    ContextAfter = contextAfter,
                     MatchedText = searchText
-                };
-
-                // Add context before
-                var startContext = Math.Max(0, i - contextLines);
-                for (int j = startContext; j < i; j++)
-                {
-                    result.ContextBefore.Add($"{j + 1:D4}: {allLines[j]}");
-                }
-
-                // Add context after
-                var endContext = Math.Min(allLines.Length - 1, i + contextLines);
-                for (int j = i + 1; j <= endContext; j++)
-                {
-                    result.ContextAfter.Add($"{j + 1:D4}: {allLines[j]}");
-                }
-
-                results.Add(result);
+                });
             }
         }
 
         return results;
     }
 
-    private static string FormatSearchResults(List<SearchResult> results, string searchText)
+    private string FormatSearchResults(List<SearchResult> results, string searchText)
     {
         if (!results.Any())
             return $"No matches found for '{searchText}'";
@@ -202,180 +204,183 @@ private bool ShouldIgnoreFile(string filePath)
         output.AppendLine($"Found {results.Count} matches for '{searchText}':");
         output.AppendLine();
 
-        foreach (var result in results)
+        var groupedResults = results.GroupBy(r => r.FilePath);
+
+        foreach (var fileGroup in groupedResults)
         {
-            output.AppendLine($"📁 {result.FilePath}:{result.LineNumber}");
+            output.AppendLine($"📁 {fileGroup.Key}");
             
-            // Context before
-            foreach (var line in result.ContextBefore)
+            foreach (var result in fileGroup)
             {
-                output.AppendLine($"  {line}");
+                output.AppendLine($"   Line {result.LineNumber}:");
+                
+                foreach (var contextLine in result.ContextBefore)
+                {
+                    output.AppendLine($"   {contextLine}");
+                }
+                
+                output.AppendLine($">>> {result.LineNumber:D4}: {result.MatchLine}");
+                
+                foreach (var contextLine in result.ContextAfter)
+                {
+                    output.AppendLine($"   {contextLine}");
+                }
+                
+                output.AppendLine();
             }
-            
-            // Match line (highlighted)
-            output.AppendLine($"► {result.LineNumber:D4}: {result.MatchLine}");
-            
-            // Context after
-            foreach (var line in result.ContextAfter)
-            {
-                output.AppendLine($"  {line}");
-            }
-            
-            output.AppendLine();
         }
 
         return output.ToString();
     }
 
-    private List<MethodSignature> ExtractMethodSignatures(string content, string[] lines, string? targetClassName)
+    private List<MethodSignature> ExtractMethodSignatures(string[] lines, string? targetClassName)
     {
         var methods = new List<MethodSignature>();
-        var currentClass = "";
-        var inClass = false;
-        var currentAttributes = new List<string>();
+        string? currentClass = null;
+        bool inClass = false;
+        int braceCount = 0;
 
         for (int i = 0; i < lines.Length; i++)
         {
             var line = lines[i].Trim();
             
-            // Track class context
+            // Track class declarations
             if (IsClassDeclaration(line))
             {
                 currentClass = ExtractClassName(line);
-                inClass = string.IsNullOrEmpty(targetClassName) || currentClass.Equals(targetClassName, StringComparison.OrdinalIgnoreCase);
-            }
-
-            // Collect attributes
-            if (line.StartsWith("[") && line.EndsWith("]"))
-            {
-                currentAttributes.Add(line);
+                inClass = targetClassName == null || currentClass == targetClassName;
+                braceCount = 0;
                 continue;
             }
 
-            // Look for method signatures
-            if (inClass && IsMethodDeclaration(line))
+            // Track braces to know when we're inside/outside classes
+            braceCount += line.Count(c => c == '{') - line.Count(c => c == '}');
+            
+            if (braceCount <= 0)
             {
-                var method = ParseMethodSignature(line, i + 1, currentClass);
-                if (method != null)
-                {
-                    method.Attributes = new List<string>(currentAttributes);
-                    methods.Add(method);
-                }
+                inClass = false;
+                currentClass = null;
             }
 
-            // Clear attributes after processing a declaration
-            if (!line.StartsWith("[") && !string.IsNullOrWhiteSpace(line))
+            // Only process methods if we're in the target class (or any class if no target specified)
+            if (inClass && IsMethodDeclaration(line) && !IsPropertyDeclaration(line))
             {
-                currentAttributes.Clear();
+                var signature = ParseMethodSignature(line, currentClass, i + 1);
+                if (signature != null)
+                {
+                    methods.Add(signature);
+                }
             }
         }
 
         return methods;
     }
 
-    private List<PropertySignature> ExtractPropertySignatures(string content, string[] lines, string? targetClassName)
+    private List<PropertySignature> ExtractPropertySignatures(string[] lines, string? targetClassName)
     {
         var properties = new List<PropertySignature>();
-        var currentClass = "";
-        var inClass = false;
-        var currentAttributes = new List<string>();
+        string? currentClass = null;
+        bool inClass = false;
+        int braceCount = 0;
 
         for (int i = 0; i < lines.Length; i++)
         {
             var line = lines[i].Trim();
             
-            // Track class context
+            // Track class declarations
             if (IsClassDeclaration(line))
             {
                 currentClass = ExtractClassName(line);
-                inClass = string.IsNullOrEmpty(targetClassName) || currentClass.Equals(targetClassName, StringComparison.OrdinalIgnoreCase);
-            }
-
-            // Collect attributes
-            if (line.StartsWith("[") && line.EndsWith("]"))
-            {
-                currentAttributes.Add(line);
+                inClass = targetClassName == null || currentClass == targetClassName;
+                braceCount = 0;
                 continue;
             }
 
-            // Look for property signatures
-            if (inClass && IsPropertyDeclaration(line))
+            // Track braces
+            braceCount += line.Count(c => c == '{') - line.Count(c => c == '}');
+            
+            if (braceCount <= 0)
             {
-                var property = ParsePropertySignature(line, i + 1);
-                if (property != null)
-                {
-                    property.Attributes = new List<string>(currentAttributes);
-                    properties.Add(property);
-                }
+                inClass = false;
+                currentClass = null;
             }
 
-            // Clear attributes after processing a declaration
-            if (!line.StartsWith("[") && !string.IsNullOrWhiteSpace(line))
+            // Only process properties if we're in the target class
+            if (inClass && IsPropertyDeclaration(line))
             {
-                currentAttributes.Clear();
+                var signature = ParsePropertySignature(line, i + 1);
+                if (signature != null)
+                {
+                    properties.Add(signature);
+                }
             }
         }
 
         return properties;
     }
 
-    private static bool IsClassDeclaration(string line)
+    private bool IsClassDeclaration(string line)
     {
-        return Regex.IsMatch(line, @"^\s*(public|private|protected|internal)?\s*(static|abstract|sealed)?\s*class\s+\w+", RegexOptions.IgnoreCase);
+        return Regex.IsMatch(line, @"^\s*(public|private|protected|internal)?\s*class\s+\w+");
     }
 
-    private static string ExtractClassName(string line)
+    private string? ExtractClassName(string line)
     {
-        var match = Regex.Match(line, @"class\s+(\w+)", RegexOptions.IgnoreCase);
-        return match.Success ? match.Groups[1].Value : "";
+        var match = Regex.Match(line, @"class\s+(\w+)");
+        return match.Success ? match.Groups[1].Value : null;
     }
 
-    private static bool IsMethodDeclaration(string line)
+    private bool IsMethodDeclaration(string line)
     {
-        // Skip properties, events, fields
-        if (line.Contains(" { get") || line.Contains(" { set") || line.Contains("event ") || line.EndsWith(";"))
-            return false;
-
-        // Look for method pattern: access_modifier [modifiers] return_type method_name(parameters)
-        return Regex.IsMatch(line, @"^\s*(public|private|protected|internal)\s+.*\w+\s*\([^)]*\)\s*(\{|$)", RegexOptions.IgnoreCase);
+        // Method pattern: access modifier + return type + method name + parameters
+        return Regex.IsMatch(line, @"^\s*(public|private|protected|internal)?\s*(static|virtual|override|abstract)?\s*\w+\s+\w+\s*\([^)]*\)\s*(where\s+.*?)?\s*[{;]");
     }
 
-    private static bool IsPropertyDeclaration(string line)
+    private bool IsPropertyDeclaration(string line)
     {
-        return Regex.IsMatch(line, @"^\s*(public|private|protected|internal)\s+.*\w+\s*\{\s*(get|set)", RegexOptions.IgnoreCase);
+        // Property pattern: access modifier + type + property name + { get/set
+        return Regex.IsMatch(line, @"^\s*(public|private|protected|internal)?\s*(static|virtual|override|abstract)?\s*\w+\s+\w+\s*{\s*(get|set)");
     }
 
-    private static MethodSignature? ParseMethodSignature(string line, int lineNumber, string className)
+    private MethodSignature? ParseMethodSignature(string line, string? className, int lineNumber)
     {
         try
         {
-            // Simplified parsing - this is a basic implementation
-            var method = new MethodSignature
+            // Remove leading/trailing whitespace and normalize
+            line = line.Trim();
+            
+            // Extract access modifier
+            var accessMatch = Regex.Match(line, @"^\s*(public|private|protected|internal)");
+            var accessModifier = accessMatch.Success ? accessMatch.Groups[1].Value : "private";
+
+            // Extract modifiers (static, virtual, etc.)
+            var modifierMatches = Regex.Matches(line, @"\b(static|virtual|override|abstract|async)\b");
+            var modifiers = modifierMatches.Cast<Match>().Select(m => m.Value).ToList();
+
+            // Extract return type and method name
+            var methodMatch = Regex.Match(line, @"(\w+)\s+(\w+)\s*\(([^)]*)\)");
+            if (!methodMatch.Success) return null;
+
+            var returnType = methodMatch.Groups[1].Value;
+            var methodName = methodMatch.Groups[2].Value;
+            var parametersStr = methodMatch.Groups[3].Value.Trim();
+            
+            var parameters = string.IsNullOrEmpty(parametersStr) 
+                ? new List<string>() 
+                : parametersStr.Split(',').Select(p => p.Trim()).ToList();
+
+            return new MethodSignature
             {
+                Name = methodName,
+                ReturnType = returnType,
+                AccessModifier = accessModifier,
+                Modifiers = modifiers,
+                Parameters = parameters,
+                FullSignature = line,
                 LineNumber = lineNumber,
-                ClassName = className,
-                FullSignature = line.Trim()
+                ClassName = className ?? "",
+                Attributes = new List<string>()
             };
-
-            // Basic extraction - would need more sophisticated parsing for production
-            if (line.Contains("public")) method.AccessModifier = "public";
-            else if (line.Contains("private")) method.AccessModifier = "private";
-            else if (line.Contains("protected")) method.AccessModifier = "protected";
-            else if (line.Contains("internal")) method.AccessModifier = "internal";
-
-            // Extract method name (basic)
-            var parenIndex = line.IndexOf('(');
-            if (parenIndex > 0)
-            {
-                var beforeParen = line.Substring(0, parenIndex).Trim();
-                var parts = beforeParen.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                if (parts.Length > 0)
-                {
-                    method.Name = parts[^1]; // Last part before parentheses
-                }
-            }
-
-            return method;
         }
         catch
         {
@@ -383,39 +388,46 @@ private bool ShouldIgnoreFile(string filePath)
         }
     }
 
-    private static PropertySignature? ParsePropertySignature(string line, int lineNumber)
+    private PropertySignature? ParsePropertySignature(string line, int lineNumber)
     {
         try
         {
-            var property = new PropertySignature
-            {
-                LineNumber = lineNumber
-            };
+            line = line.Trim();
+            
+            // Extract access modifier
+            var accessMatch = Regex.Match(line, @"^\s*(public|private|protected|internal)");
+            var accessModifier = accessMatch.Success ? accessMatch.Groups[1].Value : "private";
 
-            // Basic extraction - would need more sophisticated parsing for production
-            if (line.Contains("public")) property.AccessModifier = "public";
-            else if (line.Contains("private")) property.AccessModifier = "private";
-            else if (line.Contains("protected")) property.AccessModifier = "protected";
-            else if (line.Contains("internal")) property.AccessModifier = "internal";
+            // Extract modifiers
+            var modifierMatches = Regex.Matches(line, @"\b(static|virtual|override|abstract)\b");
+            var modifiers = modifierMatches.Cast<Match>().Select(m => m.Value).ToList();
 
-            // Extract property name (basic)
-            var braceIndex = line.IndexOf('{');
-            if (braceIndex > 0)
-            {
-                var beforeBrace = line.Substring(0, braceIndex).Trim();
-                var parts = beforeBrace.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                if (parts.Length >= 2)
-                {
-                    property.Type = parts[^2];
-                    property.Name = parts[^1];
-                }
-            }
+            // Extract property type and name
+            var propertyMatch = Regex.Match(line, @"(\w+)\s+(\w+)\s*{");
+            if (!propertyMatch.Success) return null;
+
+            var propertyType = propertyMatch.Groups[1].Value;
+            var propertyName = propertyMatch.Groups[2].Value;
 
             // Extract accessors
-            var braceContent = line.Substring(line.IndexOf('{'));
-            property.Accessors = braceContent;
+            var accessors = "";
+            if (line.Contains("get") && line.Contains("set"))
+                accessors = "get; set;";
+            else if (line.Contains("get"))
+                accessors = "get;";
+            else if (line.Contains("set"))
+                accessors = "set;";
 
-            return property;
+            return new PropertySignature
+            {
+                Name = propertyName,
+                Type = propertyType,
+                AccessModifier = accessModifier,
+                Modifiers = modifiers,
+                Accessors = accessors,
+                LineNumber = lineNumber,
+                Attributes = new List<string>()
+            };
         }
         catch
         {
@@ -423,53 +435,39 @@ private bool ShouldIgnoreFile(string filePath)
         }
     }
 
-    private static string FormatSignatureOutput(string path, List<MethodSignature> methods, List<PropertySignature> properties, string? className)
+    private string FormatSignatureOutput(List<MethodSignature> methods, List<PropertySignature> properties, string? className)
     {
         var output = new StringBuilder();
         
-        var title = string.IsNullOrEmpty(className) 
-            ? $"Method signatures from {path}" 
-            : $"Method signatures for class '{className}' in {path}";
+        var title = className != null 
+            ? $"Method signatures for class '{className}'" 
+            : "Method signatures";
             
-        output.AppendLine(title);
-        output.AppendLine(new string('=', title.Length));
+        output.AppendLine($"{title} in {methods.FirstOrDefault()?.ClassName ?? "file"}");
+        output.AppendLine(new string('=', title.Length + 20));
         output.AppendLine();
 
         if (properties.Any())
         {
             output.AppendLine("PROPERTIES:");
-            output.AppendLine(new string('-', 10));
-            foreach (var prop in properties.OrderBy(p => p.LineNumber))
+            output.AppendLine("----------");
+            foreach (var prop in properties.OrderBy(p => p.Name))
             {
-                if (prop.Attributes.Any())
-                {
-                    foreach (var attr in prop.Attributes)
-                    {
-                        output.AppendLine($"    {attr}");
-                    }
-                }
-                
-                output.AppendLine($"    {prop.AccessModifier} {prop.Type} {prop.Name} {prop.Accessors}");
-                output.AppendLine();
+                var modifierStr = prop.Modifiers.Any() ? $"{string.Join(" ", prop.Modifiers)} " : "";
+                output.AppendLine($"    {prop.AccessModifier} {modifierStr}{prop.Type} {prop.Name} {{ {prop.Accessors} }}");
             }
+            output.AppendLine();
         }
 
         if (methods.Any())
         {
             output.AppendLine("METHODS:");
-            output.AppendLine(new string('-', 8));
-            foreach (var method in methods.OrderBy(m => m.LineNumber))
+            output.AppendLine("--------");
+            foreach (var method in methods.OrderBy(m => m.Name))
             {
-                if (method.Attributes.Any())
-                {
-                    foreach (var attr in method.Attributes)
-                    {
-                        output.AppendLine($"    {attr}");
-                    }
-                }
-                
-                output.AppendLine($"    {method.AccessModifier} {method.Name}() // Line {method.LineNumber}");
-                output.AppendLine();
+                var modifierStr = method.Modifiers.Any() ? $"{string.Join(" ", method.Modifiers)} " : "";
+                var paramStr = method.Parameters.Any() ? string.Join(", ", method.Parameters) : "";
+                output.AppendLine($"    {method.AccessModifier} {modifierStr}{method.ReturnType} {method.Name}({paramStr})");
             }
         }
 
@@ -481,104 +479,86 @@ private bool ShouldIgnoreFile(string filePath)
         return output.ToString();
     }
 
-    private static HashSet<string> ParseFileTypes(string fileTypes)
+    private HashSet<string> ParseFileTypes(string fileTypes)
     {
         if (string.IsNullOrEmpty(fileTypes))
             return new HashSet<string>();
 
-        return fileTypes.Split(',', ';')
+        return fileTypes.Split(',', StringSplitOptions.RemoveEmptyEntries)
             .Select(ext => ext.Trim().ToLowerInvariant())
-            .Select(ext => ext.StartsWith(".") ? ext : "." + ext)
+            .Select(ext => ext.StartsWith('.') ? ext : $".{ext}")
             .ToHashSet();
     }
-private async Task<Models.DirectoryInfo> AnalyzeDirectoryAsync(string fullPath, string relativePath, int currentDepth, 
-        int maxDepth, HashSet<string> allowedExtensions, bool includeHidden, bool includeDetails)
+
+    private async Task<CodeEditor.MCP.Models.DirectoryInfo> AnalyzeDirectoryAsync(
+        string directoryPath, 
+        string relativePath, 
+        int currentDepth, 
+        int maxDepth, 
+        HashSet<string> allowedExtensions, 
+        bool includeHidden, 
+        bool includeDetails)
     {
-        var dirInfo = new Models.DirectoryInfo
+        var dirInfo = new CodeEditor.MCP.Models.DirectoryInfo
         {
-            Name = Path.GetFileName(fullPath) ?? "root",
-            RelativePath = relativePath
+            Name = string.IsNullOrEmpty(relativePath) ? Path.GetFileName(directoryPath) : Path.GetFileName(relativePath),
+            RelativePath = relativePath,
+            Files = new List<CodeEditor.MCP.Models.FileInfo>(),
+            Subdirectories = new List<CodeEditor.MCP.Models.DirectoryInfo>()
         };
 
         try
         {
-            // Process files - use gitignore-aware filtering for tree summary
-            var files = Directory.GetFiles(fullPath)
-                .Where(f => ShouldIncludeFileForTreeSummary(f, allowedExtensions, includeHidden))
-                .ToList();
-
-            foreach (var file in files)
+            // Add files
+            foreach (var filePath in Directory.GetFiles(directoryPath))
             {
-                var fileInfo = await CreateFileInfoAsync(file, fullPath, includeDetails);
-                dirInfo.Files.Add(fileInfo);
-                dirInfo.TotalSize += fileInfo.Size;
+                var fileName = Path.GetFileName(filePath);
+                var fileRelativePath = string.IsNullOrEmpty(relativePath) 
+                    ? fileName 
+                    : $"{relativePath}/{fileName}";
+
+                if (ShouldIncludeFile(filePath, allowedExtensions, includeHidden))
+                {
+                    var fileInfo = await CreateFileInfoAsync(filePath, fileRelativePath, includeDetails);
+                    dirInfo.Files.Add(fileInfo);
+                }
             }
 
-            dirInfo.TotalFiles = dirInfo.Files.Count;
-
-            // Process subdirectories - use gitignore-aware filtering for tree summary
+            // Add subdirectories (if not at max depth)
             if (currentDepth < maxDepth)
             {
-                var directories = Directory.GetDirectories(fullPath)
-                    .Where(d => ShouldIncludeDirectoryForTreeSummary(d, includeHidden))
-                    .ToList();
-
-                foreach (var directory in directories)
+                foreach (var subDirPath in Directory.GetDirectories(directoryPath))
                 {
-                    var subRelativePath = Path.Combine(relativePath, Path.GetFileName(directory));
-                    var subDirInfo = await AnalyzeDirectoryAsync(directory, subRelativePath, currentDepth + 1, 
-                        maxDepth, allowedExtensions, includeHidden, includeDetails);
-                    
-                    dirInfo.Subdirectories.Add(subDirInfo);
-                    dirInfo.TotalFiles += subDirInfo.TotalFiles;
-                    dirInfo.TotalSize += subDirInfo.TotalSize;
+                    var subDirName = Path.GetFileName(subDirPath);
+                    var subDirRelativePath = string.IsNullOrEmpty(relativePath) 
+                        ? subDirName 
+                        : $"{relativePath}/{subDirName}";
+
+                    if (ShouldIncludeDirectoryForTreeSummary(subDirPath, includeHidden))
+                    {
+                        var subDirInfo = await AnalyzeDirectoryAsync(
+                            subDirPath, 
+                            subDirRelativePath, 
+                            currentDepth + 1, 
+                            maxDepth, 
+                            allowedExtensions, 
+                            includeHidden, 
+                            includeDetails);
+                        
+                        dirInfo.Subdirectories.Add(subDirInfo);
+                    }
                 }
             }
         }
         catch (UnauthorizedAccessException)
         {
-            // Skip directories we can't access
-        }
-        catch (DirectoryNotFoundException)
-        {
-            // Skip directories that don't exist
+            // Skip directories we don't have access to
         }
 
         return dirInfo;
-    } 
-    private static async Task<Models.FileInfo> CreateFileInfoAsync(string filePath, string basePath, bool includeDetails)
-    {
-        var file = new System.IO.FileInfo(filePath);
-        var fileInfo = new Models.FileInfo
-        {
-            Name = file.Name,
-            RelativePath = Path.GetRelativePath(basePath, filePath),
-            Extension = file.Extension.ToLowerInvariant(),
-            LastModified = file.LastWriteTime
-        };
-
-        if (includeDetails)
-        {
-            fileInfo.Size = file.Length;
-            
-            // Count lines for text files
-            if (IsTextFile(fileInfo.Extension))
-            {
-                try
-                {
-                    var lines = await File.ReadAllLinesAsync(filePath);
-                    fileInfo.LineCount = lines.Length;
-                }
-                catch
-                {
-                    fileInfo.LineCount = 0;
-                }
-            }
-        }
-
-        return fileInfo;
     }
-private static bool ShouldIncludeFile(string filePath, HashSet<string> allowedExtensions, bool includeHidden)
+
+    private bool ShouldIncludeFile(string filePath, HashSet<string> allowedExtensions, bool includeHidden)
     {
         var fileName = Path.GetFileName(filePath);
         
@@ -586,157 +566,177 @@ private static bool ShouldIncludeFile(string filePath, HashSet<string> allowedEx
         if (!includeHidden && fileName.StartsWith("."))
             return false;
 
-        // Check file extension filter
+        // Check file extension filter (from fileTypes parameter)
         if (allowedExtensions.Any())
         {
             var extension = Path.GetExtension(filePath).ToLowerInvariant();
-            return allowedExtensions.Contains(extension);
+            if (!allowedExtensions.Contains(extension))
+                return false;
         }
 
-        // For non-filtered extensions, we don't apply additional filtering here
-        // The gitignore filtering will be handled by the calling code
-        return true;
-    } private static bool ShouldIncludeDirectory(string dirPath, bool includeHidden)
-    {
-        var dirName = Path.GetFileName(dirPath);
-        
-        // Check hidden directories
-        if (!includeHidden && dirName.StartsWith("."))
-            return false;
-
-        // For basic directory inclusion, we don't apply filtering here
-        // The gitignore filtering will be handled by the calling code  
-        return true;
-    } private static bool IsTextFile(string extension)
-    {
-        var textExtensions = new[] { ".cs", ".js", ".ts", ".json", ".xml", ".txt", ".md", ".yml", ".yaml", 
-            ".css", ".html", ".htm", ".sql", ".config", ".csproj", ".sln", ".gitignore" };
-        return textExtensions.Contains(extension);
+        // Check global filter and gitignore
+        var relativePath = _pathService.GetRelativePath(filePath);
+        return _fileFilterService.ShouldInclude(relativePath);
     }
 
-    private static string FormatDirectoryTree(Models.DirectoryInfo dirInfo, bool includeDetails, string sortBy)
+    private string FormatDirectoryTree(CodeEditor.MCP.Models.DirectoryInfo dirInfo, bool includeDetails, string sortBy)
     {
         var output = new StringBuilder();
         
-        output.AppendLine($"📁 Directory Tree Summary: {dirInfo.Name}");
-        output.AppendLine(new string('=', 50));
+        // Calculate totals
+        var totalFiles = CountTotalFiles(dirInfo);
+        var totalSize = CalculateTotalSize(dirInfo);
         
+        output.AppendLine($"📁 Directory Tree Summary: {dirInfo.Name}");
+        output.AppendLine("==================================================");
+        output.AppendLine($"Total Files: {totalFiles}");
         if (includeDetails)
         {
-            output.AppendLine($"Total Files: {dirInfo.TotalFiles}");
-            output.AppendLine($"Total Size: {FormatFileSize(dirInfo.TotalSize)}");
-            output.AppendLine();
+            output.AppendLine($"Total Size: {FormatFileSize(totalSize)}");
         }
-
-        FormatDirectoryRecursive(output, dirInfo, "", includeDetails, sortBy);
+        output.AppendLine();
+        
+        FormatDirectoryRecursive(dirInfo, output, "", true, includeDetails, sortBy);
         
         return output.ToString();
     }
 
-    private static void FormatDirectoryRecursive(StringBuilder output, Models.DirectoryInfo dirInfo, string indent, 
-        bool includeDetails, string sortBy)
+    private void FormatDirectoryRecursive(
+        CodeEditor.MCP.Models.DirectoryInfo dirInfo, 
+        StringBuilder output, 
+        string prefix, 
+        bool isLast, 
+        bool includeDetails, 
+        string sortBy)
     {
-        // Sort files
-        var sortedFiles = SortFiles(dirInfo.Files, sortBy);
+        // Directory header
+        var dirPrefix = isLast ? "📁 " : "📁 ";
+        var dirSuffix = "";
         
-        // Display files
-        foreach (var file in sortedFiles)
+        if (includeDetails)
         {
-            var icon = GetFileIcon(file.Extension);
-            var details = includeDetails ? $" ({FormatFileSize(file.Size)}" + 
-                (file.LineCount > 0 ? $", {file.LineCount} lines" : "") + ")" : "";
-            
-            output.AppendLine($"{indent}{icon} {file.Name}{details}");
+            var fileCount = CountTotalFiles(dirInfo);
+            var totalSize = CalculateTotalSize(dirInfo);
+            dirSuffix = $" ({fileCount} files, {FormatFileSize(totalSize)})";
         }
-
-        // Display subdirectories
-        foreach (var subDir in dirInfo.Subdirectories.OrderBy(d => d.Name))
+        
+        output.AppendLine($"{prefix}{dirPrefix}{dirInfo.Name}/{dirSuffix}");
+        
+        var newPrefix = prefix + (isLast ? "  " : "│ ");
+        
+        // Sort and display files
+        var sortedFiles = SortFiles(dirInfo.Files, sortBy);
+        for (int i = 0; i < sortedFiles.Count; i++)
         {
-            var details = includeDetails ? $" ({subDir.TotalFiles} files, {FormatFileSize(subDir.TotalSize)})" : "";
-            output.AppendLine($"{indent}📁 {subDir.Name}/{details}");
+            var file = sortedFiles[i];
+            var isLastFile = i == sortedFiles.Count - 1 && !dirInfo.Subdirectories.Any();
+            var fileIcon = GetFileIcon(file.Name);
+            var fileSuffix = includeDetails ? $" ({FormatFileSize(file.Size)}, {file.LineCount} lines)" : "";
             
-            if (subDir.Files.Any() || subDir.Subdirectories.Any())
-            {
-                FormatDirectoryRecursive(output, subDir, indent + "  ", includeDetails, sortBy);
-            }
+            output.AppendLine($"{newPrefix}{fileIcon} {file.Name}{fileSuffix}");
+        }
+        
+        // Sort and display subdirectories
+        var sortedDirs = dirInfo.Subdirectories.OrderBy(d => d.Name).ToList();
+        for (int i = 0; i < sortedDirs.Count; i++)
+        {
+            var subDir = sortedDirs[i];
+            var isLastSubDir = i == sortedDirs.Count - 1;
+            
+            FormatDirectoryRecursive(subDir, output, newPrefix, isLastSubDir, includeDetails, sortBy);
         }
     }
 
-    private static List<Models.FileInfo> SortFiles(List<Models.FileInfo> files, string sortBy)
+    private List<CodeEditor.MCP.Models.FileInfo> SortFiles(List<CodeEditor.MCP.Models.FileInfo> files, string sortBy)
     {
-        return sortBy.ToLowerInvariant() switch
+        return sortBy.ToLower() switch
         {
             "size" => files.OrderByDescending(f => f.Size).ToList(),
             "modified" => files.OrderByDescending(f => f.LastModified).ToList(),
-            "extension" => files.OrderBy(f => f.Extension).ThenBy(f => f.Name).ToList(),
+            "extension" => files.OrderBy(f => Path.GetExtension(f.Name)).ThenBy(f => f.Name).ToList(),
             _ => files.OrderBy(f => f.Name).ToList()
         };
     }
 
-    private static string GetFileIcon(string extension)
+    private string GetFileIcon(string fileName)
     {
+        var extension = Path.GetExtension(fileName).ToLowerInvariant();
         return extension switch
         {
             ".cs" => "🔷",
-            ".js" => "📜",
-            ".ts" => "📘",
+            ".js" => "🟨",
+            ".ts" => "🔵",
+            ".html" => "🌐",
+            ".css" => "🎨",
             ".json" => "📋",
-            ".xml" => "📄",
+            ".xml" => "📋",
             ".md" => "📝",
             ".txt" => "📄",
-            ".sql" => "🗃️",
-            ".config" => "⚙️",
-            ".csproj" => "🏗️",
-            ".sln" => "🏗️",
+            ".yml" or ".yaml" => "⚙️",
+            ".png" or ".jpg" or ".jpeg" or ".gif" => "🖼️",
             _ => "📄"
         };
     }
 
-    private static string FormatFileSize(long bytes)
+    private string FormatFileSize(long bytes)
     {
-        if (bytes == 0) return "0 B";
-        
         string[] sizes = { "B", "KB", "MB", "GB" };
+        double len = bytes;
         int order = 0;
-        double size = bytes;
-        
-        while (size >= 1024 && order < sizes.Length - 1)
+        while (len >= 1024 && order < sizes.Length - 1)
         {
             order++;
-            size /= 1024;
+            len = len / 1024;
         }
-        
-        return $"{size:0.##} {sizes[order]}";
+        return $"{len:0.##} {sizes[order]}";
     }
-private bool ShouldIncludeDirectoryForTreeSummary(string dirPath, bool includeHidden)
+
+    private int CountTotalFiles(CodeEditor.MCP.Models.DirectoryInfo dirInfo)
     {
-        var dirName = Path.GetFileName(dirPath);
+        return dirInfo.Files.Count + dirInfo.Subdirectories.Sum(CountTotalFiles);
+    }
+
+    private long CalculateTotalSize(CodeEditor.MCP.Models.DirectoryInfo dirInfo)
+    {
+        return dirInfo.Files.Sum(f => f.Size) + dirInfo.Subdirectories.Sum(CalculateTotalSize);
+    }
+
+    private bool ShouldIncludeDirectoryForTreeSummary(string directoryPath, bool includeHidden)
+    {
+        var dirName = Path.GetFileName(directoryPath);
         
-        // Check hidden directories
         if (!includeHidden && dirName.StartsWith("."))
             return false;
 
-        // Use centralized path filtering logic
-        return !_pathService.ShouldIgnoreDirectoryByPath(dirPath);
-    } private bool ShouldIncludeFileForTreeSummary(string filePath, HashSet<string> allowedExtensions, bool includeHidden)
+        // Check if directory should be ignored by gitignore
+        var relativePath = _pathService.GetRelativePath(directoryPath);
+        return !_pathService.ShouldIgnoreDirectory(relativePath);
+    }
+
+    private async Task<CodeEditor.MCP.Models.FileInfo> CreateFileInfoAsync(string filePath, string relativePath, bool includeDetails)
     {
-        var fileName = Path.GetFileName(filePath);
-        
-        // Check hidden files
-        if (!includeHidden && fileName.StartsWith("."))
-            return false;
-
-        // Use centralized path filtering logic
-        if (_pathService.ShouldIgnoreFileByPath(filePath))
-            return false;
-
-        // Check file extension filter
-        if (allowedExtensions.Any())
+        var fileInfo = new System.IO.FileInfo(filePath);
+        var result = new CodeEditor.MCP.Models.FileInfo
         {
-            var extension = Path.GetExtension(filePath).ToLowerInvariant();
-            return allowedExtensions.Contains(extension);
+            Name = fileInfo.Name,
+            RelativePath = relativePath,
+            Size = fileInfo.Length,
+            LastModified = fileInfo.LastWriteTime
+        };
+
+        if (includeDetails)
+        {
+            try
+            {
+                var lines = await File.ReadAllLinesAsync(filePath);
+                result.LineCount = lines.Length;
+            }
+            catch
+            {
+                result.LineCount = 0;
+            }
         }
 
-        // No additional filtering needed - PathService handles all ignore logic
-        return true;
-    } }
+        return result;
+    }
+}

@@ -2,9 +2,9 @@ using System.IO.Abstractions;
 
 namespace CodeEditor.MCP.Services;
 
-public class FileService(IFileSystem fileSystem, IPathService pathService) : IFileService
+public class FileService(IFileSystem fileSystem, IPathService pathService, IFileFilterService fileFilterService) : IFileService
 {
-public string[] ListFiles(string relativePath = ".")
+    public string[] ListFiles(string relativePath = ".")
     {
         var fullPath = pathService.GetFullPath(relativePath);
         var entries = fileSystem.Directory.GetFileSystemEntries(fullPath, "*", SearchOption.AllDirectories);
@@ -21,9 +21,11 @@ public string[] ListFiles(string relativePath = ".")
             return relPath;
         });
         
-        // Apply gitignore filtering - this is the core requirement
-        return pathService.FilterIgnored(relativePaths).ToArray();
-    } public string ReadFile(string relativePath)
+        // Apply both gitignore and pattern filtering
+        return fileFilterService.FilterFiles(relativePaths).ToArray();
+    }
+
+    public string ReadFile(string relativePath)
     {
         var fullPath = pathService.GetFullPath(relativePath);
         return fileSystem.File.ReadAllText(fullPath);
@@ -44,7 +46,8 @@ public string[] ListFiles(string relativePath = ".")
         else if (fileSystem.Directory.Exists(fullPath))
             fileSystem.Directory.Delete(fullPath, true);
     }
-public string[] SearchFiles(string searchText, string relativePath = ".")
+
+    public string[] SearchFiles(string searchText, string relativePath = ".")
     {
         var fullPath = pathService.GetFullPath(relativePath);
         var allFiles = fileSystem.Directory.GetFileSystemEntries(fullPath, "*", SearchOption.AllDirectories);
@@ -56,9 +59,9 @@ public string[] SearchFiles(string searchText, string relativePath = ".")
             if (fileSystem.Directory.Exists(fullFilePath))
                 continue;
                 
-            // Check if this file should be ignored
+            // Check if this file should be included (gitignore + pattern filtering)
             var relativeFilePath = pathService.GetRelativePath(fullFilePath);
-            if (pathService.ShouldIgnore(relativeFilePath))
+            if (!fileFilterService.ShouldInclude(relativeFilePath))
                 continue;
                 
             try
@@ -76,7 +79,9 @@ public string[] SearchFiles(string searchText, string relativePath = ".")
         }
         
         return results.ToArray();
-    } public void CopyFile(string sourceRelativePath, string destinationRelativePath)
+    }
+
+    public void CopyFile(string sourceRelativePath, string destinationRelativePath)
     {
         var sourcePath = pathService.GetFullPath(sourceRelativePath);
         var destPath = pathService.GetFullPath(destinationRelativePath);
