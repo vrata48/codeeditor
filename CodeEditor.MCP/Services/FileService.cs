@@ -5,35 +5,62 @@ namespace CodeEditor.MCP.Services;
 
 public class FileService(IFileSystem fileSystem, IPathService pathService) : IFileService
 {
-    public string[] ListFiles(string relativePath = ".", string? filter = null)
+public Models.FileInfo[] ListFiles(string relativePath = ".", string? filter = null)
     {
         var fullPath = pathService.GetFullPath(relativePath);
         var entries = fileSystem.Directory.GetFileSystemEntries(fullPath, "*", SearchOption.AllDirectories);
         
-        // Convert to relative paths with proper normalization
-        var relativePaths = entries.Select(entry => 
+        var fileInfos = new List<Models.FileInfo>();
+        
+        foreach (var entry in entries)
         {
             var relPath = pathService.GetRelativePath(entry);
-            // Add trailing slash for directories
-            if (fileSystem.Directory.Exists(entry) && !relPath.EndsWith("/"))
+            
+            // Skip directories for file info
+            if (fileSystem.Directory.Exists(entry))
+                continue;
+                
+            // Apply gitignore filtering
+            if (pathService.ShouldIgnore(relPath))
+                continue;
+                
+            // Apply additional filter if provided
+            if (!string.IsNullOrEmpty(filter) && !pathService.MatchesFilter(relPath, filter))
+                continue;
+            
+            try
             {
-                relPath += "/";
+                var sysFileInfo = fileSystem.FileInfo.New(entry);
+                var content = fileSystem.File.ReadAllText(entry);
+                var lineCount = content.Split('\n').Length;
+                
+                fileInfos.Add(new Models.FileInfo
+                {
+                    Name = sysFileInfo.Name,
+                    RelativePath = relPath.Replace('\\', '/'),
+                    Size = sysFileInfo.Length,
+                    LastModified = sysFileInfo.LastWriteTime,
+                    Extension = sysFileInfo.Extension,
+                    LineCount = lineCount
+                });
             }
-            return relPath;
-        });
-        
-        // Apply gitignore filtering
-        var gitignoreFiltered = pathService.FilterIgnored(relativePaths);
-        
-        // Apply additional filter if provided
-        if (!string.IsNullOrEmpty(filter))
-        {
-            return pathService.FilterByPatterns(gitignoreFiltered, filter).ToArray();
+            catch
+            {
+                // Skip files that can't be read
+                fileInfos.Add(new Models.FileInfo
+                {
+                    Name = Path.GetFileName(entry),
+                    RelativePath = relPath.Replace('\\', '/'),
+                    Size = -1, // Indicates unreadable
+                    LastModified = DateTime.MinValue,
+                    Extension = Path.GetExtension(entry),
+                    LineCount = -1
+                });
+            }
         }
         
-        return gitignoreFiltered.ToArray();
-    }
-
+        return fileInfos.ToArray();
+    } 
     public string ReadFile(string relativePath)
     {
         var fullPath = pathService.GetFullPath(relativePath);
@@ -151,4 +178,32 @@ public class FileService(IFileSystem fileSystem, IPathService pathService) : IFi
             CopyDirectory(dir, destSubDir);
         }
     }
-}
+public string ReadFileRange(string relativePath, int startLine, int endLine)
+    {
+        if (startLine < 1)
+            throw new ArgumentException("Start line must be 1 or greater", nameof(startLine));
+        
+        if (endLine < startLine)
+            throw new ArgumentException("End line must be greater than or equal to start line", nameof(endLine));
+        
+        var content = ReadFile(relativePath);
+        var allLines = content.Split('\n');
+        
+        // Convert to 0-based indexing
+        var startIndex = startLine - 1;
+        var endIndex = Math.Min(endLine - 1, allLines.Length - 1);
+        
+        if (startIndex >= allLines.Length)
+        {
+            return $"// Line {startLine} is beyond end of file (file has {allLines.Length} lines)";
+        }
+        
+        var selectedLines = allLines.Skip(startIndex).Take(endIndex - startIndex + 1);
+        var result = string.Join('\n', selectedLines);
+        
+        // Add context information
+        var prefix = startLine > 1 ? $"// ... ({startLine - 1} lines above)\n" : "";
+        var suffix = endLine < allLines.Length ? $"\n// ... ({allLines.Length - endLine} lines below)" : "";
+        
+        return prefix + result + suffix;
+    } }

@@ -11,8 +11,9 @@ namespace CodeEditor.MCP.Tools;
 public static class FileTools
 {
     [McpServerTool]
-    [Description("Lists all files and directories in the specified path with optional pattern filtering.")]
-    public static string[] ListFiles(
+    [Description(
+        "Lists all files and directories in the specified path with optional pattern filtering and detailed file information.")]
+    public static Models.FileInfo[] ListFiles(
         IFileService service,
         [Description("Directory path to list (defaults to current directory)")]
         string path = ".",
@@ -86,5 +87,19 @@ public static class FileTools
         FileOperation[] operations)
     {
         service.MoveFiles(operations);
+    }
+
+    [McpServerTool]
+    [Description("Reads a specific range of lines from a file for targeted content viewing.")]
+    public static string ReadFileRange(
+        IFileService service,
+        [Description("Path to the file to read")]
+        string path,
+        [Description("Starting line number (1-based)")]
+        int startLine,
+        [Description("Ending line number (1-based, inclusive)")]
+        int endLine)
+    {
+        return service.ReadFileRange(path, startLine, endLine);
     }
 }
