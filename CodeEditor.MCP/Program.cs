@@ -20,8 +20,6 @@ await Parser.Default.ParseArguments<Options>(args)
         // Register core dependencies
         builder.Services.AddSingleton<IFileSystem, FileSystem>();
         builder.Services.AddSingleton<IPathService>(_ => new PathService(baseDirectory));
-        builder.Services.AddSingleton<IFileFilterService>(_ => new FileFilterService(
-            new PathService(baseDirectory), null));
         
         // Register the tool logging service (used by AspectInjector)
         builder.Services.AddSingleton<IToolLoggingService, ToolLoggingService>();

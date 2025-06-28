@@ -1,90 +1,90 @@
 using System.ComponentModel;
 using CodeEditor.MCP.Services;
 using CodeEditor.MCP.Aspects;
+using CodeEditor.MCP.Models;
 using ModelContextProtocol.Server;
 
 namespace CodeEditor.MCP.Tools;
 
 [McpServerToolType]
-[ToolLoggingAspect] // Apply logging aspect to all methods in this class
+[ToolLoggingAspect]
 public static class FileTools
 {
     [McpServerTool]
-    [Description("List files and folders.")]
+    [Description("Lists all files and directories in the specified path with optional pattern filtering.")]
     public static string[] ListFiles(
         IFileService service,
-        [Description("Path to list (default: root).")] string path = ".")
+        [Description("Directory path to list (defaults to current directory)")]
+        string path = ".",
+        [Description("File pattern filter (e.g. '*.cs' for C# files, '*.js,*.ts' for multiple types)")]
+        string? filter = null)
     {
-        return service.ListFiles(path);
+        return service.ListFiles(path, filter);
     }
-    
+
     [McpServerTool]
-    [Description("Read file content.")]
+    [Description("Reads and returns the complete contents of a text file.")]
     public static string ReadFile(
         IFileService service,
-        [Description("Path to file.")] string path)
+        [Description("Path to the file to read")]
+        string path)
     {
         return service.ReadFile(path);
     }
-    
+
     [McpServerTool]
-    [Description("Write file content.")]
+    [Description("Creates or overwrites a file with the specified content.")]
     public static void WriteFile(
         IFileService service,
-        [Description("Path to file.")] string path,
-        [Description("File content.")] string content)
+        [Description("Path where the file should be created or updated")]
+        string path,
+        [Description("Text content to write to the file")]
+        string content)
     {
         service.WriteFile(path, content);
     }
-    
+
     [McpServerTool]
-    [Description("Delete file or folder.")]
+    [Description("Permanently deletes one or more files or directories.")]
     public static void DeleteFile(
         IFileService service,
-        [Description("Path to delete.")] string path)
+        [Description("List of file or directory paths to delete")]
+        string[] paths)
     {
-        service.DeleteFile(path);
+        service.DeleteFiles(paths);
     }
-    
+
     [McpServerTool]
-    [Description("Search for text in files.")]
+    [Description("Searches for text content within files, with optional pattern filtering.")]
     public static string[] SearchFiles(
         IFileService service,
-        [Description("Text to search for.")] string text,
-        [Description("Path to search in (default: root).")] string path = ".")
+        [Description("Text string to search for within file contents")]
+        string text,
+        [Description("Directory path to search in (defaults to current directory)")]
+        string path = ".",
+        [Description("File pattern filter to limit search scope (e.g. '*.cs,*.js')")]
+        string? filter = null)
     {
-        return service.SearchFiles(text, path);
+        return service.SearchFiles(text, path, filter);
     }
-    
+
     [McpServerTool]
-    [Description("Copy file or folder.")]
+    [Description("Copies files or directories using source-destination pairs.")]
     public static void CopyFile(
         IFileService service,
-        [Description("Source Path.")] string source,
-        [Description("Destination Path.")] string destination)
+        [Description("Array of file operations, each containing source and destination paths")]
+        FileOperation[] operations)
     {
-        service.CopyFile(source, destination);
+        service.CopyFiles(operations);
     }
-    
+
     [McpServerTool]
-    [Description("Move or rename file or folder.")]
+    [Description("Moves or renames files and directories using source-destination pairs.")]
     public static void MoveFile(
         IFileService service,
-        [Description("Source Path.")] string source,
-        [Description("Destination Path.")] string destination)
+        [Description("Array of file operations, each containing source and destination paths")]
+        FileOperation[] operations)
     {
-        service.MoveFile(source, destination);
-    }
-    
-    [McpServerTool]
-    [Description("Show current file filter settings.")]
-    public static string GetFilterInfo(IFileFilterService filterService)
-    {
-        var filter = filterService.GlobalFilter;
-        if (string.IsNullOrEmpty(filter))
-        {
-            return "No file filter is currently active. All files (except those in .gitignore) are included.";
-        }
-        return $"Active file filter: {filter}";
+        service.MoveFiles(operations);
     }
 }

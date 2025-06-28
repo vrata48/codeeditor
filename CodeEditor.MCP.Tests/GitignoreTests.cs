@@ -29,10 +29,8 @@ private void CreateServicesAfterGitignore()
     {
         _pathService = new PathService(_testProjectDirectory);
         _fileSystem = new System.IO.Abstractions.FileSystem();
-        var fileFilterService = new FileFilterService(_pathService, null);
-        _fileService = new FileService(_fileSystem, _pathService, fileFilterService);
-    } 
-    [Fact]
+        _fileService = new FileService(_fileSystem, _pathService);
+    }     [Fact]
     public void ListFiles_WithoutGitignore_ReturnsAllFiles()
     {
         // Arrange - Create various files WITHOUT .gitignore first

@@ -1,10 +1,11 @@
 using System.IO.Abstractions;
+using CodeEditor.MCP.Models;
 
 namespace CodeEditor.MCP.Services;
 
-public class FileService(IFileSystem fileSystem, IPathService pathService, IFileFilterService fileFilterService) : IFileService
+public class FileService(IFileSystem fileSystem, IPathService pathService) : IFileService
 {
-    public string[] ListFiles(string relativePath = ".")
+    public string[] ListFiles(string relativePath = ".", string? filter = null)
     {
         var fullPath = pathService.GetFullPath(relativePath);
         var entries = fileSystem.Directory.GetFileSystemEntries(fullPath, "*", SearchOption.AllDirectories);
@@ -21,8 +22,16 @@ public class FileService(IFileSystem fileSystem, IPathService pathService, IFile
             return relPath;
         });
         
-        // Apply both gitignore and pattern filtering
-        return fileFilterService.FilterFiles(relativePaths).ToArray();
+        // Apply gitignore filtering
+        var gitignoreFiltered = pathService.FilterIgnored(relativePaths);
+        
+        // Apply additional filter if provided
+        if (!string.IsNullOrEmpty(filter))
+        {
+            return pathService.FilterByPatterns(gitignoreFiltered, filter).ToArray();
+        }
+        
+        return gitignoreFiltered.ToArray();
     }
 
     public string ReadFile(string relativePath)
@@ -38,16 +47,19 @@ public class FileService(IFileSystem fileSystem, IPathService pathService, IFile
         fileSystem.File.WriteAllText(fullPath, content);
     }
     
-    public void DeleteFile(string relativePath)
+    public void DeleteFiles(string[] relativePaths)
     {
-        var fullPath = pathService.GetFullPath(relativePath);
-        if (fileSystem.File.Exists(fullPath))
-            fileSystem.File.Delete(fullPath);
-        else if (fileSystem.Directory.Exists(fullPath))
-            fileSystem.Directory.Delete(fullPath, true);
+        foreach (var relativePath in relativePaths)
+        {
+            var fullPath = pathService.GetFullPath(relativePath);
+            if (fileSystem.File.Exists(fullPath))
+                fileSystem.File.Delete(fullPath);
+            else if (fileSystem.Directory.Exists(fullPath))
+                fileSystem.Directory.Delete(fullPath, true);
+        }
     }
 
-    public string[] SearchFiles(string searchText, string relativePath = ".")
+    public string[] SearchFiles(string searchText, string relativePath = ".", string? filter = null)
     {
         var fullPath = pathService.GetFullPath(relativePath);
         var allFiles = fileSystem.Directory.GetFileSystemEntries(fullPath, "*", SearchOption.AllDirectories);
@@ -59,9 +71,13 @@ public class FileService(IFileSystem fileSystem, IPathService pathService, IFile
             if (fileSystem.Directory.Exists(fullFilePath))
                 continue;
                 
-            // Check if this file should be included (gitignore + pattern filtering)
+            // Check if this file should be included (gitignore filtering)
             var relativeFilePath = pathService.GetRelativePath(fullFilePath);
-            if (!fileFilterService.ShouldInclude(relativeFilePath))
+            if (pathService.ShouldIgnore(relativeFilePath))
+                continue;
+                
+            // Apply additional filter if provided
+            if (!string.IsNullOrEmpty(filter) && !pathService.MatchesFilter(relativeFilePath, filter))
                 continue;
                 
             try
@@ -81,35 +97,41 @@ public class FileService(IFileSystem fileSystem, IPathService pathService, IFile
         return results.ToArray();
     }
 
-    public void CopyFile(string sourceRelativePath, string destinationRelativePath)
+    public void CopyFiles(FileOperation[] operations)
     {
-        var sourcePath = pathService.GetFullPath(sourceRelativePath);
-        var destPath = pathService.GetFullPath(destinationRelativePath);
-        
-        if (fileSystem.File.Exists(sourcePath))
+        foreach (var operation in operations)
         {
-            fileSystem.Directory.CreateDirectory(Path.GetDirectoryName(destPath)!);
-            fileSystem.File.Copy(sourcePath, destPath, true);
-        }
-        else if (fileSystem.Directory.Exists(sourcePath))
-        {
-            CopyDirectory(sourcePath, destPath);
+            var sourcePath = pathService.GetFullPath(operation.Source);
+            var destPath = pathService.GetFullPath(operation.Destination);
+            
+            if (fileSystem.File.Exists(sourcePath))
+            {
+                fileSystem.Directory.CreateDirectory(Path.GetDirectoryName(destPath)!);
+                fileSystem.File.Copy(sourcePath, destPath, true);
+            }
+            else if (fileSystem.Directory.Exists(sourcePath))
+            {
+                CopyDirectory(sourcePath, destPath);
+            }
         }
     }
     
-    public void MoveFile(string sourceRelativePath, string destinationRelativePath)
+    public void MoveFiles(FileOperation[] operations)
     {
-        var sourcePath = pathService.GetFullPath(sourceRelativePath);
-        var destPath = pathService.GetFullPath(destinationRelativePath);
-        
-        if (fileSystem.File.Exists(sourcePath))
+        foreach (var operation in operations)
         {
-            fileSystem.Directory.CreateDirectory(Path.GetDirectoryName(destPath)!);
-            fileSystem.File.Move(sourcePath, destPath);
-        }
-        else if (fileSystem.Directory.Exists(sourcePath))
-        {
-            fileSystem.Directory.Move(sourcePath, destPath);
+            var sourcePath = pathService.GetFullPath(operation.Source);
+            var destPath = pathService.GetFullPath(operation.Destination);
+            
+            if (fileSystem.File.Exists(sourcePath))
+            {
+                fileSystem.Directory.CreateDirectory(Path.GetDirectoryName(destPath)!);
+                fileSystem.File.Move(sourcePath, destPath);
+            }
+            else if (fileSystem.Directory.Exists(sourcePath))
+            {
+                fileSystem.Directory.Move(sourcePath, destPath);
+            }
         }
     }
     

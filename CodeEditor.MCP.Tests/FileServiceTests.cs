@@ -1,5 +1,6 @@
 using System.IO.Abstractions.TestingHelpers;
 using CodeEditor.MCP.Services;
+using CodeEditor.MCP.Models;
 using FluentAssertions;
 
 namespace CodeEditor.MCP.Tests;
@@ -19,14 +20,15 @@ public class FileServiceTests : IDisposable
         Directory.CreateDirectory(_testProjectDirectory);
         SetupServices();
     }
-private void SetupServices()
+
+    private void SetupServices()
     {
         _pathService = new PathService(_testProjectDirectory);
         _fileSystem = new MockFileSystem();
         _fileSystem.AddDirectory(_testProjectDirectory);
-        var fileFilterService = new FileFilterService(_pathService, null);
-        _fileService = new FileService(_fileSystem, _pathService, fileFilterService);
-    } 
+        _fileService = new FileService(_fileSystem, _pathService);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_tempDirectory))
@@ -84,7 +86,7 @@ private void SetupServices()
     }
 
     [Fact]
-    public void DeleteFile_ExistingFile_RemovesFile()
+    public void DeleteFiles_SingleFile_RemovesFile()
     {
         // Arrange
         var relativePath = "to-delete.txt";
@@ -92,14 +94,14 @@ private void SetupServices()
         _fileSystem.AddFile(fullPath, new MockFileData("content"));
 
         // Act
-        _fileService.DeleteFile(relativePath);
+        _fileService.DeleteFiles(new[] { relativePath });
 
         // Assert
         _fileSystem.File.Exists(fullPath).Should().BeFalse();
     }
 
     [Fact]
-    public void DeleteFile_ExistingDirectory_RemovesDirectory()
+    public void DeleteFiles_SingleDirectory_RemovesDirectory()
     {
         // Arrange
         var relativePath = "dir-to-delete";
@@ -108,7 +110,7 @@ private void SetupServices()
         _fileSystem.AddFile(Path.Combine(fullPath, "file.txt"), new MockFileData("content"));
 
         // Act
-        _fileService.DeleteFile(relativePath);
+        _fileService.DeleteFiles(new[] { relativePath });
 
         // Assert
         _fileSystem.Directory.Exists(fullPath).Should().BeFalse();
@@ -151,7 +153,7 @@ private void SetupServices()
     }
 
     [Fact]
-    public void CopyFile_ExistingFile_CopiesSuccessfully()
+    public void CopyFiles_SingleFile_CopiesSuccessfully()
     {
         // Arrange
         var sourceFile = Path.Combine(_testProjectDirectory, "source.txt");
@@ -161,7 +163,7 @@ private void SetupServices()
         _fileSystem.AddFile(sourceFile, new MockFileData(content));
 
         // Act
-        _fileService.CopyFile("source.txt", "destination.txt");
+        _fileService.CopyFiles(new[] { new FileOperation { Source = "source.txt", Destination = "destination.txt" } });
 
         // Assert
         _fileSystem.File.Exists(destFile).Should().BeTrue();
@@ -170,7 +172,7 @@ private void SetupServices()
     }
 
     [Fact]
-    public void CopyFile_Directory_CopiesRecursively()
+    public void CopyFiles_SingleDirectory_CopiesRecursively()
     {
         // Arrange
         var sourceDir = Path.Combine(_testProjectDirectory, "source-dir");
@@ -182,7 +184,7 @@ private void SetupServices()
         _fileSystem.AddFile(Path.Combine(sourceDir, "subdir", "file2.txt"), new MockFileData("Content 2"));
 
         // Act
-        _fileService.CopyFile("source-dir", "dest-dir");
+        _fileService.CopyFiles(new[] { new FileOperation { Source = "source-dir", Destination = "dest-dir" } });
 
         // Assert
         _fileSystem.Directory.Exists(destDir).Should().BeTrue();
@@ -193,7 +195,7 @@ private void SetupServices()
     }
 
     [Fact]
-    public void MoveFile_ExistingFile_MovesSuccessfully()
+    public void MoveFiles_SingleFile_MovesSuccessfully()
     {
         // Arrange
         var sourceFile = Path.Combine(_testProjectDirectory, "source.txt");
@@ -203,7 +205,7 @@ private void SetupServices()
         _fileSystem.AddFile(sourceFile, new MockFileData(content));
 
         // Act
-        _fileService.MoveFile("source.txt", "destination.txt");
+        _fileService.MoveFiles(new[] { new FileOperation { Source = "source.txt", Destination = "destination.txt" } });
 
         // Assert
         _fileSystem.File.Exists(destFile).Should().BeTrue();
@@ -212,7 +214,7 @@ private void SetupServices()
     }
 
     [Fact]
-    public void MoveFile_ExistingDirectory_MovesSuccessfully()
+    public void MoveFiles_SingleDirectory_MovesSuccessfully()
     {
         // Arrange
         var sourceDir = Path.Combine(_testProjectDirectory, "source-dir");
@@ -222,7 +224,7 @@ private void SetupServices()
         _fileSystem.AddFile(Path.Combine(sourceDir, "file.txt"), new MockFileData("Content"));
 
         // Act
-        _fileService.MoveFile("source-dir", "dest-dir");
+        _fileService.MoveFiles(new[] { new FileOperation { Source = "source-dir", Destination = "dest-dir" } });
 
         // Assert
         _fileSystem.Directory.Exists(destDir).Should().BeTrue();
@@ -289,5 +291,156 @@ private void SetupServices()
         results.Should().HaveCountGreaterThan(0);
         results.Should().Contain("file1.txt");
         results.Should().Contain("file2.txt");
+    }
+
+    [Fact]
+    public void DeleteFiles_MultipleFiles_DeletesAllFiles()
+    {
+        // Arrange
+        var files = new[] { "file1.txt", "file2.txt", "file3.txt" };
+        foreach (var file in files)
+        {
+            var fullPath = Path.Combine(_testProjectDirectory, file);
+            _fileSystem.AddFile(fullPath, new MockFileData("content"));
+        }
+
+        // Act
+        _fileService.DeleteFiles(files);
+
+        // Assert
+        foreach (var file in files)
+        {
+            var fullPath = Path.Combine(_testProjectDirectory, file);
+            _fileSystem.File.Exists(fullPath).Should().BeFalse();
+        }
+    }
+
+    [Fact]
+    public void CopyFiles_MultipleFiles_CopiesAllFiles()
+    {
+        // Arrange
+        var operations = new[]
+        {
+            new FileOperation { Source = "source1.txt", Destination = "dest1.txt" },
+            new FileOperation { Source = "source2.txt", Destination = "dest2.txt" },
+            new FileOperation { Source = "source3.txt", Destination = "dest3.txt" }
+        };
+        var content = "test content";
+
+        foreach (var op in operations)
+        {
+            var fullPath = Path.Combine(_testProjectDirectory, op.Source);
+            _fileSystem.AddFile(fullPath, new MockFileData(content));
+        }
+
+        // Act
+        _fileService.CopyFiles(operations);
+
+        // Assert
+        foreach (var op in operations)
+        {
+            var destFullPath = Path.Combine(_testProjectDirectory, op.Destination);
+            var sourceFullPath = Path.Combine(_testProjectDirectory, op.Source);
+            
+            _fileSystem.File.Exists(destFullPath).Should().BeTrue();
+            _fileSystem.File.ReadAllText(destFullPath).Should().Be(content);
+            _fileSystem.File.Exists(sourceFullPath).Should().BeTrue(); // Source should still exist
+        }
+    }
+
+    [Fact]
+    public void MoveFiles_MultipleFiles_MovesAllFiles()
+    {
+        // Arrange
+        var operations = new[]
+        {
+            new FileOperation { Source = "source1.txt", Destination = "dest1.txt" },
+            new FileOperation { Source = "source2.txt", Destination = "dest2.txt" },
+            new FileOperation { Source = "source3.txt", Destination = "dest3.txt" }
+        };
+        var content = "test content";
+
+        foreach (var op in operations)
+        {
+            var fullPath = Path.Combine(_testProjectDirectory, op.Source);
+            _fileSystem.AddFile(fullPath, new MockFileData(content));
+        }
+
+        // Act
+        _fileService.MoveFiles(operations);
+
+        // Assert
+        foreach (var op in operations)
+        {
+            var destFullPath = Path.Combine(_testProjectDirectory, op.Destination);
+            var sourceFullPath = Path.Combine(_testProjectDirectory, op.Source);
+            
+            _fileSystem.File.Exists(destFullPath).Should().BeTrue();
+            _fileSystem.File.ReadAllText(destFullPath).Should().Be(content);
+            _fileSystem.File.Exists(sourceFullPath).Should().BeFalse(); // Source should be gone
+        }
+    }
+
+    [Fact]
+    public void ListFiles_WithFilter_ReturnsOnlyMatchingFiles()
+    {
+        // Arrange
+        var file1 = Path.Combine(_testProjectDirectory, "test.cs");
+        var file2 = Path.Combine(_testProjectDirectory, "test.txt");
+        var file3 = Path.Combine(_testProjectDirectory, "program.cs");
+        
+        _fileSystem.AddFile(file1, new MockFileData("content"));
+        _fileSystem.AddFile(file2, new MockFileData("content"));
+        _fileSystem.AddFile(file3, new MockFileData("content"));
+
+        // Act
+        var results = _fileService.ListFiles(".", "*.cs");
+
+        // Assert
+        results.Should().Contain("test.cs");
+        results.Should().Contain("program.cs");
+        results.Should().NotContain("test.txt");
+    }
+
+    [Fact]
+    public void SearchFiles_WithFilter_SearchesOnlyMatchingFiles()
+    {
+        // Arrange
+        var file1 = Path.Combine(_testProjectDirectory, "test.cs");
+        var file2 = Path.Combine(_testProjectDirectory, "test.txt");
+        var file3 = Path.Combine(_testProjectDirectory, "program.cs");
+        
+        _fileSystem.AddFile(file1, new MockFileData("search content"));
+        _fileSystem.AddFile(file2, new MockFileData("search content"));
+        _fileSystem.AddFile(file3, new MockFileData("other content"));
+
+        // Act
+        var results = _fileService.SearchFiles("search", ".", "*.cs");
+
+        // Assert
+        results.Should().Contain("test.cs");
+        results.Should().NotContain("test.txt"); // Filtered out by pattern
+        results.Should().NotContain("program.cs"); // Doesn't contain search term
+    }
+
+    [Fact]
+    public void ListFiles_WithMultiplePatterns_ReturnsMatchingFiles()
+    {
+        // Arrange
+        var file1 = Path.Combine(_testProjectDirectory, "test.cs");
+        var file2 = Path.Combine(_testProjectDirectory, "config.json");
+        var file3 = Path.Combine(_testProjectDirectory, "readme.txt");
+        
+        _fileSystem.AddFile(file1, new MockFileData("content"));
+        _fileSystem.AddFile(file2, new MockFileData("content"));
+        _fileSystem.AddFile(file3, new MockFileData("content"));
+
+        // Act
+        var results = _fileService.ListFiles(".", "*.cs,*.json");
+
+        // Assert
+        results.Should().Contain("test.cs");
+        results.Should().Contain("config.json");
+        results.Should().NotContain("readme.txt");
     }
 }

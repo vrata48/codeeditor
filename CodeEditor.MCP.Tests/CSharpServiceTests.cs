@@ -572,8 +572,7 @@ Console.WriteLine(""Hello World"");
         var filePath = Path.Combine(_testProjectDirectory, "BadFormat.cs");
         _fileSystem.AddFile(filePath, new MockFileData(badlyFormattedCode));
         // Create required services
-        var fileFilterService = new FileFilterService(_pathService, null);
-        var fileService = new FileService(_fileSystem, _pathService, fileFilterService);
+        var fileService = new FileService(_fileSystem, _pathService);
         var formattingService = new CSharpFormattingService(fileService, _pathService, _fileSystem);
         // Act
         var result = formattingService.FormatDocument("BadFormat.cs");
@@ -586,8 +585,7 @@ Console.WriteLine(""Hello World"");
         formattedContent.Should().Contain("namespace BadFormat");
         formattedContent.Should().Contain("public class TestClass");
         formattedContent.Should().Contain("Console.WriteLine");
-    } 
-[Fact]
+    } [Fact]
     public void FormatDocument_WithSyntaxErrors_ReturnsErrorMessage()
     {
         // Arrange - Create a C# file with syntax errors
@@ -606,8 +604,7 @@ Console.WriteLine(""Hello"");
         var filePath = Path.Combine(_testProjectDirectory, "BadSyntax.cs");
         _fileSystem.AddFile(filePath, new MockFileData(badCode));
         // Create required services
-        var fileFilterService = new FileFilterService(_pathService, null);
-        var fileService = new FileService(_fileSystem, _pathService, fileFilterService);
+        var fileService = new FileService(_fileSystem, _pathService);
         var formattingService = new CSharpFormattingService(fileService, _pathService, _fileSystem);
         // Act
         var result = formattingService.FormatDocument("BadSyntax.cs");

@@ -24,11 +24,9 @@ private void SetupServices()
         _pathService = new PathService(_testProjectDirectory);
         _fileSystem = new MockFileSystem();
         _fileSystem.AddDirectory(_testProjectDirectory);
-        var fileFilterService = new FileFilterService(_pathService, null);
-        _fileService = new FileService(_fileSystem, _pathService, fileFilterService);
+        _fileService = new FileService(_fileSystem, _pathService);
         _formattingService = new CSharpFormattingService(_fileService, _pathService, _fileSystem);
-    } 
-    public void Dispose()
+    }     public void Dispose()
     {
         if (Directory.Exists(_tempDirectory))
         {
