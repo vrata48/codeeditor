@@ -1,15 +1,24 @@
+using System.Diagnostics;
 using Ignore;
 
 namespace CodeEditor.MCP.Services;
 
 public class PathService : IPathService
 {
-    private readonly string _baseDirectory;
-    private readonly List<string> _gitignorePatterns = new();
-    private readonly Ignore.Ignore _ignore = new();
+    private string _baseDirectory = null!;
+    private List<string> _gitignorePatterns = null!;
+    private Ignore.Ignore _ignore = null!;
 
     public PathService(string baseDirectory)
     {
+        SetBaseDirectory(baseDirectory);
+    }
+    
+    public void SetBaseDirectory(string baseDirectory)
+    {
+        _gitignorePatterns = [];
+        _ignore  = new Ignore.Ignore();
+        
         _baseDirectory = Path.GetFullPath(baseDirectory);
         
         // Always ignore .git directory
@@ -88,7 +97,8 @@ public class PathService : IPathService
     {
         return _baseDirectory;
     }
-public bool ShouldIgnore(string relativePath)
+
+    public bool ShouldIgnore(string relativePath)
     {
         if (string.IsNullOrEmpty(relativePath))
             return false;
@@ -149,7 +159,9 @@ public bool ShouldIgnore(string relativePath)
         {
             return false;
         }
-    }     private bool MatchesGitignorePattern(string path, string pattern)
+    }
+
+    private bool MatchesGitignorePattern(string path, string pattern)
     {
         // Handle basic gitignore patterns
         pattern = pattern.Trim();
@@ -209,7 +221,8 @@ public bool ShouldIgnore(string relativePath)
             return "DefaultNamespace";
         return namespaceName;
     }
-public string GetRelativePath(string fullPath)
+
+    public string GetRelativePath(string fullPath)
     {
         if (string.IsNullOrEmpty(fullPath))
             return "";
@@ -223,7 +236,9 @@ public string GetRelativePath(string fullPath)
         
         // Normalize to forward slashes
         return relativePath.Replace('\\', '/');
-    }     public bool ShouldIgnoreDirectory(string relativePath)
+    }
+
+    public bool ShouldIgnoreDirectory(string relativePath)
     {
         if (string.IsNullOrEmpty(relativePath))
             return false;
@@ -294,7 +309,8 @@ public string GetRelativePath(string fullPath)
         var relativePath = GetRelativePath(fullPath);
         return ShouldIgnoreDirectory(relativePath);
     }
-public bool MatchesFilter(string relativePath, string? filterPatterns)
+
+    public bool MatchesFilter(string relativePath, string? filterPatterns)
     {
         if (string.IsNullOrEmpty(filterPatterns))
             return true;
@@ -338,16 +354,21 @@ public bool MatchesFilter(string relativePath, string? filterPatterns)
         }
 
         return false;
-    } public IEnumerable<string> FilterByPatterns(IEnumerable<string> relativePaths, string? filterPatterns)
+    }
+
+    public IEnumerable<string> FilterByPatterns(IEnumerable<string> relativePaths, string? filterPatterns)
     {
         if (string.IsNullOrEmpty(filterPatterns))
             return relativePaths;
 
         return relativePaths.Where(path => MatchesFilter(path, filterPatterns));
-    } private static string WildcardToRegex(string pattern)
+    }
+
+    private static string WildcardToRegex(string pattern)
     {
         var regex = System.Text.RegularExpressions.Regex.Escape(pattern)
             .Replace("\\*", ".*")
             .Replace("\\?", ".");
         return "^" + regex + "$";
-    } }
+    }
+}

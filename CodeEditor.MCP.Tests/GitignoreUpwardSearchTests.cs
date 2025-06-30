@@ -164,14 +164,13 @@ obj/";
         var files = _fileService.ListFiles();
 
         // Assert - Files matching patterns from any level should be filtered out
-        files.Should().Contain(x => x.EndsWith("Button.cs"));
-        files.Should().Contain(x => x.EndsWith("LoginForm.cs"));
+        files.Should().Contain(x => x.RelativePath.EndsWith("Button.cs"));
+        files.Should().Contain(x => x.RelativePath.EndsWith("LoginForm.cs"));
         
-        files.Should().NotContain(x => x.EndsWith("app.log")); // Filtered by parent .gitignore
-        files.Should().NotContain(x => x.EndsWith("cache.tmp")); // Filtered by parent .gitignore
-        files.Should().NotContain(x => x.EndsWith("debug.log")); // Filtered by parent .gitignore
-    } 
-    [Fact]
+        files.Should().NotContain(x => x.RelativePath.EndsWith("app.log")); // Filtered by parent .gitignore
+        files.Should().NotContain(x => x.RelativePath.EndsWith("cache.tmp")); // Filtered by parent .gitignore
+        files.Should().NotContain(x => x.RelativePath.EndsWith("debug.log")); // Filtered by parent .gitignore
+    }     [Fact]
     public void PathService_StopsAtFileSystemRoot()
     {
         // Arrange - This test ensures we don't infinite loop trying to go above filesystem root

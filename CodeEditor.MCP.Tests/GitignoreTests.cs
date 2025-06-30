@@ -47,14 +47,13 @@ private void CreateServicesAfterGitignore()
         var files = _fileService.ListFiles();
 
         // Assert - All files should be returned when no .gitignore exists
-        files.Should().Contain(x => x.EndsWith("Program.cs"));
-        files.Should().Contain(x => x.EndsWith("app.log"));
-        files.Should().Contain(x => x.EndsWith("README.md"));
-        files.Should().Contain(x => x.Contains("bin"));
-        files.Should().Contain(x => x.Contains("obj"));
-    }
-
-    [Fact]
+        files.Should().Contain(x => x.RelativePath.EndsWith("Program.cs"));
+        files.Should().Contain(x => x.RelativePath.EndsWith("app.log"));
+        files.Should().Contain(x => x.RelativePath.EndsWith("README.md"));
+        files.Should().Contain(x => x.RelativePath.Contains("bin"));
+        files.Should().Contain(x => x.RelativePath.Contains("obj"));
+    } 
+[Fact]
     public void ListFiles_WithBasicGitignore_FiltersCorrectly()
     {
         // Arrange - Create .gitignore FIRST
@@ -78,15 +77,14 @@ obj/";
         var files = _fileService.ListFiles();
 
         // Assert - Ignored files should not be returned
-        files.Should().Contain(x => x.EndsWith("Program.cs"));
-        files.Should().Contain(x => x.EndsWith("README.md"));
-        files.Should().Contain(x => x.EndsWith(".gitignore"));
-        files.Should().NotContain(x => x.EndsWith("app.log"));
-        files.Should().NotContain(x => x.EndsWith("debug.log"));
-        files.Should().NotContain(x => x.Contains("bin"));
-        files.Should().NotContain(x => x.Contains("obj"));
-    }
-
+        files.Should().Contain(x => x.RelativePath.EndsWith("Program.cs"));
+        files.Should().Contain(x => x.RelativePath.EndsWith("README.md"));
+        files.Should().Contain(x => x.RelativePath.EndsWith(".gitignore"));
+        files.Should().NotContain(x => x.RelativePath.EndsWith("app.log"));
+        files.Should().NotContain(x => x.RelativePath.EndsWith("debug.log"));
+        files.Should().NotContain(x => x.RelativePath.Contains("bin"));
+        files.Should().NotContain(x => x.RelativePath.Contains("obj"));
+    } 
     [Fact]
     public void PathService_DirectoryPatterns_WorkWithTrailingSlash()
     {
@@ -109,8 +107,7 @@ logs/";
         _pathService.ShouldIgnore("binary.txt").Should().BeFalse("binary.txt should not match bin/ pattern");
         _pathService.ShouldIgnore("objects.cs").Should().BeFalse("objects.cs should not match obj/ pattern");
     }
-
-    [Fact]
+[Fact]
     public void ListFiles_WithComplexGitignore_HandlesVariousPatterns()
     {
         // Arrange - Create comprehensive .gitignore FIRST
@@ -179,31 +176,30 @@ secret.txt";
         var files = _fileService.ListFiles();
 
         // Assert - Only non-ignored files should be returned
-        files.Should().Contain(x => x.EndsWith("Program.cs"));
-        files.Should().Contain(x => x.EndsWith("README.md"));
-        files.Should().Contain(x => x.EndsWith("User.cs"));
-        files.Should().Contain(x => x.EndsWith("UserTests.cs"));
-        files.Should().Contain(x => x.EndsWith("api.md"));
-        files.Should().Contain(x => x.EndsWith(".gitignore"));
+        files.Should().Contain(x => x.RelativePath.EndsWith("Program.cs"));
+        files.Should().Contain(x => x.RelativePath.EndsWith("README.md"));
+        files.Should().Contain(x => x.RelativePath.EndsWith("User.cs"));
+        files.Should().Contain(x => x.RelativePath.EndsWith("UserTests.cs"));
+        files.Should().Contain(x => x.RelativePath.EndsWith("api.md"));
+        files.Should().Contain(x => x.RelativePath.EndsWith(".gitignore"));
 
         // Verify ignored files are not present
-        files.Should().NotContain(x => x.EndsWith("app.log"));
-        files.Should().NotContain(x => x.EndsWith("app.exe"));
-        files.Should().NotContain(x => x.EndsWith("app.dll"));
-        files.Should().NotContain(x => x.Contains(".vs"));
-        files.Should().NotContain(x => x.Contains(".vscode"));
-        files.Should().NotContain(x => x.EndsWith("project.user"));
-        files.Should().NotContain(x => x.Contains("logs"));
-        files.Should().NotContain(x => x.Contains("temp"));
-        files.Should().NotContain(x => x.EndsWith("backup~"));
-        files.Should().NotContain(x => x.EndsWith(".DS_Store"));
-        files.Should().NotContain(x => x.EndsWith("Thumbs.db"));
-        files.Should().NotContain(x => x.EndsWith("package.nupkg"));
-        files.Should().NotContain(x => x.Contains("packages"));
-        files.Should().NotContain(x => x.EndsWith("secret.txt"));
-    }
-
-    [Fact]
+        files.Should().NotContain(x => x.RelativePath.EndsWith("app.log"));
+        files.Should().NotContain(x => x.RelativePath.EndsWith("app.exe"));
+        files.Should().NotContain(x => x.RelativePath.EndsWith("app.dll"));
+        files.Should().NotContain(x => x.RelativePath.Contains(".vs"));
+        files.Should().NotContain(x => x.RelativePath.Contains(".vscode"));
+        files.Should().NotContain(x => x.RelativePath.EndsWith("project.user"));
+        files.Should().NotContain(x => x.RelativePath.Contains("logs"));
+        files.Should().NotContain(x => x.RelativePath.Contains("temp"));
+        files.Should().NotContain(x => x.RelativePath.EndsWith("backup~"));
+        files.Should().NotContain(x => x.RelativePath.EndsWith(".DS_Store"));
+        files.Should().NotContain(x => x.RelativePath.EndsWith("Thumbs.db"));
+        files.Should().NotContain(x => x.RelativePath.EndsWith("package.nupkg"));
+        files.Should().NotContain(x => x.RelativePath.Contains("packages"));
+        files.Should().NotContain(x => x.RelativePath.EndsWith("secret.txt"));
+    } 
+[Fact]
     public void ListFiles_WithCommentsAndEmptyLines_IgnoresThemCorrectly()
     {
         // Arrange - Create .gitignore with comments and empty lines FIRST
@@ -231,13 +227,12 @@ obj/
         var files = _fileService.ListFiles();
 
         // Assert
-        files.Should().Contain(x => x.EndsWith("Program.cs"));
-        files.Should().NotContain(x => x.EndsWith("app.log"));
-        files.Should().NotContain(x => x.Contains("bin"));
-        files.Should().NotContain(x => x.Contains("obj"));
-    }
-
-    [Fact]
+        files.Should().Contain(x => x.RelativePath.EndsWith("Program.cs"));
+        files.Should().NotContain(x => x.RelativePath.EndsWith("app.log"));
+        files.Should().NotContain(x => x.RelativePath.Contains("bin"));
+        files.Should().NotContain(x => x.RelativePath.Contains("obj"));
+    } 
+[Fact]
     public void ListFiles_WithNestedDirectories_RespectsGitignorePatterns()
     {
         // Arrange - Create .gitignore FIRST
@@ -263,17 +258,16 @@ node_modules/";
         var files = _fileService.ListFiles();
 
         // Assert - Should include source files but exclude ignored directories
-        files.Should().Contain(x => x.EndsWith("app.js"));
-        files.Should().Contain(x => x.EndsWith("helper.js"));
-        files.Should().Contain(x => x.EndsWith("Button.js"));
-        files.Should().Contain(x => x.EndsWith("app.test.js"));
-        files.Should().Contain(x => x.EndsWith("settings.json"));
+        files.Should().Contain(x => x.RelativePath.EndsWith("app.js"));
+        files.Should().Contain(x => x.RelativePath.EndsWith("helper.js"));
+        files.Should().Contain(x => x.RelativePath.EndsWith("Button.js"));
+        files.Should().Contain(x => x.RelativePath.EndsWith("app.test.js"));
+        files.Should().Contain(x => x.RelativePath.EndsWith("settings.json"));
 
-        files.Should().NotContain(x => x.Contains("bin"));
-        files.Should().NotContain(x => x.Contains("node_modules"));
-        files.Should().NotContain(x => x.EndsWith("app.log"));
-    }
-[Fact]
+        files.Should().NotContain(x => x.RelativePath.Contains("bin"));
+        files.Should().NotContain(x => x.RelativePath.Contains("node_modules"));
+        files.Should().NotContain(x => x.RelativePath.EndsWith("app.log"));
+    } [Fact]
     public void ListFiles_WithGlobPatterns_HandlesCorrectly()
     {
         // Arrange - Create .gitignore with glob patterns FIRST
@@ -300,17 +294,16 @@ build/*
         var files = _fileService.ListFiles();
 
         // Assert
-        files.Should().Contain(x => x.EndsWith("regular-file.txt"));
-        files.Should().Contain(x => x.EndsWith("important.log")); // Should NOT be ignored due to !
+        files.Should().Contain(x => x.RelativePath.EndsWith("regular-file.txt"));
+        files.Should().Contain(x => x.RelativePath.EndsWith("important.log")); // Should NOT be ignored due to !
         
-        files.Should().NotContain(x => x.EndsWith("app.log"));
-        files.Should().NotContain(x => x.EndsWith("test-file.txt"));
-        files.Should().NotContain(x => x.EndsWith("test-data.json"));
-        files.Should().NotContain(x => x.Contains("temp"));
-        files.Should().NotContain(x => x.Contains("build/debug"));
-        files.Should().NotContain(x => x.Contains("build/release"));
-    } 
-    [Fact]
+        files.Should().NotContain(x => x.RelativePath.EndsWith("app.log"));
+        files.Should().NotContain(x => x.RelativePath.EndsWith("test-file.txt"));
+        files.Should().NotContain(x => x.RelativePath.EndsWith("test-data.json"));
+        files.Should().NotContain(x => x.RelativePath.Contains("temp"));
+        files.Should().NotContain(x => x.RelativePath.Contains("build/debug"));
+        files.Should().NotContain(x => x.RelativePath.Contains("build/release"));
+    }     [Fact]
     public void ListFiles_WithMalformedGitignore_DoesNotCrash()
     {
         // Arrange - Create malformed .gitignore FIRST
@@ -334,10 +327,9 @@ bin/";
         // The behavior may vary depending on how the Ignore library handles malformed patterns,
         // but it should not crash
         files.Should().NotBeNull();
-        files.Should().Contain(x => x.EndsWith("normal.txt"));
-    }
-
-    [Fact]
+        files.Should().Contain(x => x.RelativePath.EndsWith("normal.txt"));
+    } 
+[Fact]
     public void ListFiles_GitignoreInSubdirectory_DoesNotAffectRootListing()
     {
         // Arrange - Create .gitignore in subdirectory (should be ignored)
@@ -352,11 +344,10 @@ bin/";
         var files = _fileService.ListFiles();
 
         // Assert - Subdirectory .gitignore should not affect root listing
-        files.Should().Contain(x => x.EndsWith("Program.cs"));
-        files.Should().Contain(x => x.EndsWith("Helper.cs"));
-        files.Should().Contain(x => x.EndsWith(".gitignore")); // The subdirectory .gitignore file itself
-    }
-
+        files.Should().Contain(x => x.RelativePath.EndsWith("Program.cs"));
+        files.Should().Contain(x => x.RelativePath.EndsWith("Helper.cs"));
+        files.Should().Contain(x => x.RelativePath.EndsWith(".gitignore")); // The subdirectory .gitignore file itself
+    } 
     [Fact]
     public void PathService_ShouldIgnore_WorksWithIndividualPaths()
     {
@@ -441,24 +432,23 @@ bin/";
         var files = _fileService.ListFiles();
 
         // Assert - .git directory should be automatically ignored
-        files.Should().Contain(x => x.EndsWith("Program.cs"));
-        files.Should().Contain(x => x.EndsWith("README.md"));
-        files.Should().Contain(x => x.EndsWith(".gitignore"));
+        files.Should().Contain(x => x.RelativePath.EndsWith("Program.cs"));
+        files.Should().Contain(x => x.RelativePath.EndsWith("README.md"));
+        files.Should().Contain(x => x.RelativePath.EndsWith(".gitignore"));
         
         // .git directory and its contents should be ignored (but not .gitignore file)
-        files.Should().NotContain(x => x.StartsWith(".git/"));
-        files.Should().NotContain(x => x == ".git");
-        files.Should().NotContain(x => x.Contains(".git/config"));
-        files.Should().NotContain(x => x.Contains(".git/HEAD"));
-        files.Should().NotContain(x => x.Contains(".git/objects"));
-        files.Should().NotContain(x => x.Contains(".git/refs"));
+        files.Should().NotContain(x => x.RelativePath.StartsWith(".git/"));
+        files.Should().NotContain(x => x.RelativePath == ".git");
+        files.Should().NotContain(x => x.RelativePath.Contains(".git/config"));
+        files.Should().NotContain(x => x.RelativePath.Contains(".git/HEAD"));
+        files.Should().NotContain(x => x.RelativePath.Contains(".git/objects"));
+        files.Should().NotContain(x => x.RelativePath.Contains(".git/refs"));
         
         // Verify directly with PathService
         _pathService.ShouldIgnore(".git/").Should().BeTrue(".git/ should be automatically ignored");
         _pathService.ShouldIgnore(".git/config").Should().BeTrue(".git/config should be ignored");
         _pathService.ShouldIgnore(".git/objects/abc123").Should().BeTrue("nested .git files should be ignored");
-    } 
-    private void CreateTestFile(string relativePath, string content)
+    }     private void CreateTestFile(string relativePath, string content)
     {
         var fullPath = Path.Combine(_testProjectDirectory, relativePath);
         var directory = Path.GetDirectoryName(fullPath);

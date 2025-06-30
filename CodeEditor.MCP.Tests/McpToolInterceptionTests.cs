@@ -53,8 +53,7 @@ public class McpToolInterceptionTests
         // This test verifies that the DI setup and tool calls work correctly
         Assert.True(true);
     }
-
-    [Fact]
+[Fact]
     public void McpToolsListFilesWorks()
     {
         // Arrange
@@ -83,7 +82,6 @@ public class McpToolInterceptionTests
         var files = FileTools.ListFiles(fileService, ".");
 
         // Assert
-        Assert.Contains("file1.txt", files);
-        Assert.Contains("file2.cs", files);
-    }
-}
+        Assert.Contains(files, f => f.Name == "file1.txt");
+        Assert.Contains(files, f => f.Name == "file2.cs");
+    } }

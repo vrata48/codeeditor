@@ -4,6 +4,7 @@ public interface IPathService
 {
     string GetFullPath(string relativePath);
     string GetBaseDirectory();
+    void SetBaseDirectory(string baseDirectory);
     bool ShouldIgnore(string relativePath);
     IEnumerable<string> FilterIgnored(IEnumerable<string> relativePaths);
     string GetNamespaceFromPath(string relativePath);
